@@ -1,0 +1,14 @@
+class HelloWorldTest extends PHPUnit\Framework\TestCase {
+    public function testHelloWorld() {
+        $this->assertEquals('Hello, World!', 'Hello, World!');
+    }
+}
+
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="vendor/autoload.php">
+    <testsuites>
+        <testsuite name="Unit Tests">
+            <directory>./tests/Unit</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
