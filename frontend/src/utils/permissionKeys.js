@@ -42,4 +42,28 @@ export const PERMS = {
     update: 'prestataires.update',
     delete: 'prestataires.delete',
   },
+  mandats: {
+    view: 'mandats.view',
+    create: 'mandats.create',
+    update: 'mandats.update',
+    delete: 'mandats.delete',
+  },
+  avenants: {
+    view: 'avenants.view',
+    create: 'avenants.create',
+    update: 'avenants.update',
+    delete: 'avenants.delete',
+  },
+  baux: {
+    view: 'baux.view',
+    create: 'baux.create',
+    update: 'baux.update',
+    delete: 'baux.delete',
+  },
+  remises_cles: {
+    view: 'remises-cles.view',
+    create: 'remises-cles.create',
+    update: 'remises-cles.update',
+    delete: 'remises-cles.delete',
+  },
 };

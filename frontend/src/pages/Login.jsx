@@ -20,7 +20,8 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (e) {
-      setError(e?.data?.message || 'Échec de connexion');
+      // Surface network errors (e.error) or backend message when available
+      setError(e?.data?.message || e?.error || 'Échec de connexion');
     }
   };
 

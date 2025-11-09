@@ -25,7 +25,9 @@ class LocataireFactory extends Factory
         return [
             'type_personne' => $type,
             'nom' => $nom,
+            'nom_ar' => $isPerson ? 'اسم عائلي' : null,
             'prenom' => $prenom,
+            'prenom_ar' => $isPerson ? 'الاسم الشخصي' : null,
             'raison_sociale' => $raisonSociale,
             'date_naissance' => $isPerson ? $faker->date() : null,
             'lieu_naissance' => $isPerson ? $faker->city() : null,
@@ -39,6 +41,7 @@ class LocataireFactory extends Factory
             'ifiscale' => $faker->numerify('########'),
             'adresse_bien_loue' => $faker->address(),
             'adresse_actuelle' => $faker->address(),
+            'adresse_ar' => 'العنوان الحالي',
             'telephone' => $faker->phoneNumber(),
             'email' => $faker->unique()->safeEmail(),
             'profession_activite' => $isPerson ? $faker->jobTitle() : 'societe',

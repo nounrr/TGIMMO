@@ -115,7 +115,9 @@ class LocataireController extends Controller
         $rules = [
             'type_personne' => ['nullable', 'in:personne,societe'],
             'nom' => ['nullable', 'string', 'max:150'],
+            'nom_ar' => ['nullable', 'string', 'max:150'],
             'prenom' => ['nullable', 'string', 'max:150'],
+            'prenom_ar' => ['nullable', 'string', 'max:150'],
             'raison_sociale' => ['nullable', 'string', 'max:200'],
             'date_naissance' => ['nullable', 'date'],
             'lieu_naissance' => ['nullable', 'string', 'max:150'],
@@ -129,6 +131,7 @@ class LocataireController extends Controller
             'ifiscale' => ['nullable', 'string', 'max:50'],
             'adresse_bien_loue' => ['nullable', 'string', 'max:255'],
             'adresse_actuelle' => ['nullable', 'string', 'max:255'],
+            'adresse_ar' => ['nullable', 'string'],
             'telephone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:150'],
             'profession_activite' => ['nullable', 'string', 'max:150'],

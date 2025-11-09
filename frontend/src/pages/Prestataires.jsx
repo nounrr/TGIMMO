@@ -17,6 +17,7 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 export default function Prestataires() {
   const { can } = useAuthz();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDomaine, setSelectedDomaine] = useState('all');
   const [sorting, setSorting] = useState([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
@@ -28,10 +29,11 @@ export default function Prestataires() {
       page: pagination.pageIndex + 1,
       per_page: pagination.pageSize,
       q: searchTerm || undefined,
+      domaine_activite: selectedDomaine !== 'all' ? selectedDomaine : undefined,
       sort_by: sortBy,
       sort_dir: sort ? sortDir : undefined,
     };
-  }, [pagination.pageIndex, pagination.pageSize, searchTerm, sorting]);
+  }, [pagination.pageIndex, pagination.pageSize, searchTerm, selectedDomaine, sorting]);
 
   const { data, isLoading, error } = useGetPrestatairesQuery(queryParams);
   const [deletePrestataire, { isLoading: isDeleting }] = useDeletePrestataireMutation();
@@ -49,17 +51,24 @@ export default function Prestataires() {
       accessorKey: 'nom_raison',
       header: 'Nom / Raison sociale',
       enableSorting: true,
-      cell: ({ row }) => {
-        const p = row.original;
-        return (
-          <div>
-            <div className="fw-semibold text-slate-900">{p.nom_raison}</div>
-            {p.domaine_activite && (
-              <div className="text-slate-500 small">{p.domaine_activite}</div>
-            )}
-          </div>
-        );
-      },
+      cell: ({ getValue }) => (
+        <div className="fw-semibold text-slate-900">{getValue()}</div>
+      ),
+    },
+    {
+      accessorKey: 'domaine_activite',
+      header: 'Domaine d\'activité',
+      enableSorting: true,
+      cell: ({ getValue }) => (
+        <span className="badge rounded-pill px-3 py-2" style={{
+          background: 'linear-gradient(135deg, #e0e7ff 0%, #ede9fe 100%)',
+          color: '#4338ca',
+          fontSize: '0.875rem',
+          fontWeight: 500
+        }}>
+          {getValue() || 'Non spécifié'}
+        </span>
+      ),
     },
     {
       accessorKey: 'contact_nom',
@@ -225,7 +234,7 @@ export default function Prestataires() {
         >
           <div className="card-body p-4">
             <div className="row g-3">
-              <div className="col-12 col-md-6">
+              <div className="col-12 col-md-6 col-lg-8">
                 <div className="position-relative">
                   <svg className="position-absolute top-50 translate-middle-y" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" style={{ left: '16px', opacity: 0.5, pointerEvents: 'none', zIndex: 10 }}>
                     <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
@@ -239,6 +248,28 @@ export default function Prestataires() {
                     style={{ background: '#f8f9fa', paddingLeft: '3rem' }}
                   />
                 </div>
+              </div>
+              <div className="col-12 col-md-6 col-lg-4">
+                <select
+                  className="form-select form-select-lg rounded-3 border-0 shadow-sm"
+                  value={selectedDomaine}
+                  onChange={(e) => setSelectedDomaine(e.target.value)}
+                  style={{ background: '#f8f9fa' }}
+                >
+                  <option value="all">Tous les domaines</option>
+                  <option value="Plomberie">Plomberie</option>
+                  <option value="Électricité">Électricité</option>
+                  <option value="Peinture">Peinture</option>
+                  <option value="Menuiserie">Menuiserie</option>
+                  <option value="Climatisation">Climatisation</option>
+                  <option value="Jardinage">Jardinage</option>
+                  <option value="Nettoyage">Nettoyage</option>
+                  <option value="Sécurité">Sécurité</option>
+                  <option value="Assurance">Assurance</option>
+                  <option value="Comptabilité">Comptabilité</option>
+                  <option value="Juridique">Juridique</option>
+                  <option value="Autre">Autre</option>
+                </select>
               </div>
             </div>
           </div>

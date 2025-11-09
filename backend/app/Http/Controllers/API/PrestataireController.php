@@ -33,6 +33,11 @@ class PrestataireController extends Controller
             });
         }
 
+        // Filtre par domaine d'activité
+        if ($domaine = $request->query('domaine_activite')) {
+            $q->where('domaine_activite', 'like', "%{$domaine}%");
+        }
+
         // Tri sécurisé
         $sortBy = $request->query('sort_by');
         $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';

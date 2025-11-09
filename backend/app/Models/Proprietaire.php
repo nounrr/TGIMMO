@@ -13,11 +13,14 @@ class Proprietaire extends Model
 
     protected $fillable = [
         'nom_raison',
+        'nom_ar',
+        'prenom_ar',
         'cin',
         'rc',
         'ice',
         'ifiscale',
         'adresse',
+        'adresse_ar',
         'telephone',
         'email',
         'representant_nom',
@@ -36,4 +39,16 @@ class Proprietaire extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    public function unites()
+    {
+        return $this->belongsToMany(Unite::class, 'unites_proprietaires', 'proprietaire_id', 'unite_id')
+            ->withPivot(['part_numerateur', 'part_denominateur', 'part_pourcent', 'date_debut', 'date_fin'])
+            ->withTimestamps();
+    }
+
+    public function mandatsGestion()
+    {
+        return $this->hasMany(MandatGestion::class, 'proprietaire_id');
+    }
 }

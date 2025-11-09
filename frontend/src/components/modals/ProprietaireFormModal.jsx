@@ -25,11 +25,14 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
 
   const [formData, setFormData] = useState({
     nom_raison: '',
+    nom_ar: '',
+    prenom_ar: '',
     cin: '',
     rc: '',
     ice: '',
     ifiscale: '',
     adresse: '',
+    adresse_ar: '',
     telephone: '',
     email: '',
     representant_nom: '',
@@ -46,11 +49,14 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
     if (proprietaire) {
       setFormData({
         nom_raison: proprietaire.nom_raison || '',
+        nom_ar: proprietaire.nom_ar || '',
+        prenom_ar: proprietaire.prenom_ar || '',
         cin: proprietaire.cin || '',
         rc: proprietaire.rc || '',
         ice: proprietaire.ice || '',
         ifiscale: proprietaire.ifiscale || '',
         adresse: proprietaire.adresse || '',
+        adresse_ar: proprietaire.adresse_ar || '',
         telephone: proprietaire.telephone || '',
         email: proprietaire.email || '',
         representant_nom: proprietaire.representant_nom || '',
@@ -65,11 +71,14 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
     } else {
       setFormData({
         nom_raison: '',
+        nom_ar: '',
+        prenom_ar: '',
         cin: '',
         rc: '',
         ice: '',
         ifiscale: '',
         adresse: '',
+        adresse_ar: '',
         telephone: '',
         email: '',
         representant_nom: '',
@@ -217,6 +226,66 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                           onChange={handleChange}
                           required
                           placeholder="Nom complet ou raison sociale"
+                          style={{
+                            background: '#f8fafc',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '12px',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.background = 'white';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.background = '#f8fafc';
+                            e.target.style.boxShadow = '';
+                          }}
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small text-slate-700">
+                          الاسم بالعربية
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control border-0 shadow-sm"
+                          name="nom_ar"
+                          value={formData.nom_ar}
+                          onChange={handleChange}
+                          placeholder="الاسم"
+                          dir="rtl"
+                          style={{
+                            background: '#f8fafc',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '12px',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.background = 'white';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.background = '#f8fafc';
+                            e.target.style.boxShadow = '';
+                          }}
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small text-slate-700">
+                          النسب بالعربية
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control border-0 shadow-sm"
+                          name="prenom_ar"
+                          value={formData.prenom_ar}
+                          onChange={handleChange}
+                          placeholder="النسب"
+                          dir="rtl"
                           style={{
                             background: '#f8fafc',
                             padding: '0.75rem 1rem',
@@ -442,6 +511,37 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                           onChange={handleChange}
                           rows="3"
                           placeholder="Adresse complète du propriétaire"
+                          style={{
+                            background: '#f8fafc',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '12px',
+                            transition: 'all 0.2s',
+                            resize: 'vertical'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.background = 'white';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.background = '#f8fafc';
+                            e.target.style.boxShadow = '';
+                          }}
+                        />
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold small text-slate-700">
+                          العنوان بالعربية
+                        </label>
+                        <textarea
+                          className="form-control border-0 shadow-sm"
+                          name="adresse_ar"
+                          value={formData.adresse_ar}
+                          onChange={handleChange}
+                          rows="3"
+                          placeholder="العنوان الكامل"
+                          dir="rtl"
                           style={{
                             background: '#f8fafc',
                             padding: '0.75rem 1rem',

@@ -1,6 +1,26 @@
 import { useEffect } from 'react';
 
 export default function LocataireDetailsModal({ show, onHide, locataire }) {
+  // Helper to format ISO dates like 2003-02-28T00:00:00.000000Z to dd/mm/yyyy
+  const formatDate = (value) => {
+    if (!value) return '-';
+    try {
+      if (typeof value === 'string') {
+        const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(value);
+        if (m) {
+          const [, y, mo, d] = m;
+          return `${d}/${mo}/${y}`;
+        }
+      }
+      const dt = new Date(value);
+      if (!isNaN(dt.getTime())) {
+        return dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      }
+    } catch (_) {
+      // ignore and fall back below
+    }
+    return String(value);
+  };
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -19,7 +39,9 @@ export default function LocataireDetailsModal({ show, onHide, locataire }) {
 
   if (!show || !locataire) return null;
 
-  const isPhysique = locataire.type_personne === 'physique';
+  // Support both UI values ('physique'/'morale') and API values ('personne'/'societe')
+  const type = locataire.type_personne;
+  const isPhysique = type === 'physique' || type === 'personne';
 
   return (
     <div className="modal show d-block" style={{ background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)' }} onClick={onHide}>
@@ -39,7 +61,16 @@ export default function LocataireDetailsModal({ show, onHide, locataire }) {
               </h5>
               <p className="mb-0 small" style={{ color: 'rgba(255,255,255,0.9)' }}>
                 {isPhysique 
-                  ? `${locataire.prenom || ''} ${locataire.nom || ''}`.trim()
+                  ? (
+                    <>
+                      {`${locataire.prenom || ''} ${locataire.nom || ''}`.trim()}
+                      {(locataire.prenom_ar || locataire.nom_ar) && (
+                        <span className="d-block" dir="rtl" style={{ fontSize: '0.85rem', opacity: 0.9 }}>
+                          {`${locataire.prenom_ar || ''} ${locataire.nom_ar || ''}`.trim()}
+                        </span>
+                      )}
+                    </>
+                  )
                   : locataire.raison_sociale}
                 <span 
                   className="badge ms-2 d-inline-flex align-items-center gap-1" 
@@ -111,6 +142,11 @@ export default function LocataireDetailsModal({ show, onHide, locataire }) {
                         <div className="p-3 rounded-3" style={{ background: '#f8fafc' }}>
                           <label className="small fw-semibold mb-1" style={{ color: '#64748b' }}>Nom complet</label>
                           <div className="fw-semibold" style={{ color: '#1e293b' }}>{`${locataire.prenom || ''} ${locataire.nom || ''}`.trim() || '-'}</div>
+                          {(locataire.prenom_ar || locataire.nom_ar) && (
+                            <div className="fw-semibold mt-1" style={{ color: '#64748b' }} dir="rtl">
+                              {`${locataire.prenom_ar || ''} ${locataire.nom_ar || ''}`.trim()}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="col-md-6">
@@ -122,7 +158,7 @@ export default function LocataireDetailsModal({ show, onHide, locataire }) {
                       <div className="col-md-6">
                         <div className="p-3 rounded-3" style={{ background: '#f8fafc' }}>
                           <label className="small fw-semibold mb-1" style={{ color: '#64748b' }}>Date de naissance</label>
-                          <div className="fw-semibold" style={{ color: '#1e293b' }}>{locataire.date_naissance || '-'}</div>
+                          <div className="fw-semibold" style={{ color: '#1e293b' }}>{formatDate(locataire.date_naissance)}</div>
                         </div>
                       </div>
                       <div className="col-md-6">
@@ -161,7 +197,7 @@ export default function LocataireDetailsModal({ show, onHide, locataire }) {
                       <div className="col-md-6">
                         <div className="p-3 rounded-3" style={{ background: '#f8fafc' }}>
                           <label className="small fw-semibold mb-1" style={{ color: '#64748b' }}>Date de création</label>
-                          <div className="fw-semibold" style={{ color: '#1e293b' }}>{locataire.date_creation_entreprise || '-'}</div>
+                          <div className="fw-semibold" style={{ color: '#1e293b' }}>{formatDate(locataire.date_creation_entreprise)}</div>
                         </div>
                       </div>
                       <div className="col-md-6">
@@ -241,6 +277,11 @@ export default function LocataireDetailsModal({ show, onHide, locataire }) {
                     <div className="p-3 rounded-3" style={{ background: '#f8fafc' }}>
                       <label className="small fw-semibold mb-1" style={{ color: '#64748b' }}>Adresse actuelle</label>
                       <div className="fw-semibold" style={{ color: '#1e293b' }}>{locataire.adresse_actuelle || '-'}</div>
+                      {locataire.adresse_ar && (
+                        <div className="fw-semibold mt-2" style={{ color: '#64748b' }} dir="rtl">
+                          {locataire.adresse_ar}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="col-md-12">

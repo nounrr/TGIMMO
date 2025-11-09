@@ -97,6 +97,11 @@ export default function ProprietaireDetailsModal({ show, onHide, proprietaire })
                   <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
                     <div>
                       <h4 className="fw-bold mb-2">{proprietaire.nom_raison}</h4>
+                      {(proprietaire.nom_ar || proprietaire.prenom_ar) && (
+                        <div className="mb-2" dir="rtl" style={{ fontSize: '1.1rem', opacity: 0.95 }}>
+                          {proprietaire.nom_ar} {proprietaire.prenom_ar}
+                        </div>
+                      )}
                       <div className="d-flex align-items-center gap-2 mb-2">
                         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                           <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z"/>
@@ -212,6 +217,21 @@ export default function ProprietaireDetailsModal({ show, onHide, proprietaire })
                           <div className="flex-grow-1">
                             <div className="text-muted small">Adresse</div>
                             <div className="fw-medium text-slate-800">{proprietaire.adresse}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {proprietaire.adresse_ar && (
+                      <div className="col-12">
+                        <div className="d-flex align-items-start gap-2">
+                          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" className="text-amber-600 mt-1">
+                            <path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A31.493 31.493 0 0 1 8 14.58a31.481 31.481 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94zM8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10z"/>
+                            <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+                          </svg>
+                          <div className="flex-grow-1">
+                            <div className="text-muted small">العنوان بالعربية</div>
+                            <div className="fw-medium text-slate-800" dir="rtl">{proprietaire.adresse_ar}</div>
                           </div>
                         </div>
                       </div>

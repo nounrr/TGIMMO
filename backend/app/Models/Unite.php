@@ -38,4 +38,16 @@ class Unite extends Model
     {
         return $this->belongsTo(Locataire::class, 'locataire_actuel_id');
     }
+
+    public function proprietaires()
+    {
+        return $this->belongsToMany(Proprietaire::class, 'unites_proprietaires', 'unite_id', 'proprietaire_id')
+            ->withPivot(['part_numerateur', 'part_denominateur', 'part_pourcent', 'date_debut', 'date_fin'])
+            ->withTimestamps();
+    }
+
+    public function ownerships()
+    {
+        return $this->hasMany(UniteProprietaire::class, 'unite_id');
+    }
 }

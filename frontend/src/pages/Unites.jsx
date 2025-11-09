@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGetUnitesQuery, useDeleteUniteMutation } from '../features/unites/unitesApi';
 import UniteFormModal from '../components/modals/UniteFormModal';
 import UniteDetailsModal from '../components/modals/UniteDetailsModal';
@@ -12,6 +13,7 @@ import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
 
 export default function Unites() {
+  const navigate = useNavigate();
   const { can } = useAuthz();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
@@ -23,7 +25,7 @@ export default function Unites() {
   const queryParams = useMemo(() => ({
     page: pagination.pageIndex + 1,
     per_page: pagination.pageSize,
-    search: searchTerm || undefined,
+    q: searchTerm || undefined,
     type_unite: selectedType !== 'all' ? selectedType : undefined,
     statut: selectedStatut !== 'all' ? selectedStatut : undefined,
   }), [pagination.pageIndex, pagination.pageSize, searchTerm, selectedType, selectedStatut]);
@@ -280,6 +282,57 @@ export default function Unites() {
               </svg>
             </button>
             )}
+            {can(PERMS.baux.create) && unite.statut === 'vacant' && (
+            <button 
+              className="btn btn-sm rounded-3 border-0"
+              style={{ 
+                width: '36px', 
+                height: '36px', 
+                padding: 0,
+                background: '#dcfce7',
+                color: '#15803d',
+                transition: 'all 0.2s'
+              }}
+              title="Créer un bail pour cette unité"
+              onClick={() => navigate(`/baux/nouveau?unite_id=${unite.id}`)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#bbf7d0';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#dcfce7';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}>
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
+                <path d="M8 6.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V11a.5.5 0 0 1-1 0V9.5H6a.5.5 0 0 1 0-1h1.5V7a.5.5 0 0 1 .5-.5z"/>
+              </svg>
+            </button>
+            )}
+            <button 
+              className="btn btn-sm rounded-3 border-0"
+              style={{ 
+                width: '36px', 
+                height: '36px', 
+                padding: 0,
+                background: '#ecfeff',
+                color: '#0e7490',
+                transition: 'all 0.2s'
+              }}
+              title="Propriétaires"
+              onClick={() => navigate(`/unites/${unite.id}/owners`)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#cffafe';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#ecfeff';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}>
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+              </svg>
+            </button>
             {can(PERMS.unites.delete) && (
             <button 
               className="btn btn-sm rounded-3 border-0"

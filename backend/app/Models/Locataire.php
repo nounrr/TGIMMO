@@ -14,7 +14,9 @@ class Locataire extends Model
     protected $fillable = [
         'type_personne',
         'nom',
+        'nom_ar',
         'prenom',
+        'prenom_ar',
         'raison_sociale',
         'date_naissance',
         'lieu_naissance',
@@ -28,6 +30,7 @@ class Locataire extends Model
         'ifiscale',
         'adresse_bien_loue',
         'adresse_actuelle',
+        'adresse_ar',
         'telephone',
         'email',
         'profession_activite',

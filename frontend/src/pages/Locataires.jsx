@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
 import { useGetLocatairesQuery, useDeleteLocataireMutation } from '../features/locataires/locatairesApi';
@@ -13,6 +14,7 @@ import {
 
 export default function Locataires() {
   const { can } = useAuthz();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [sorting, setSorting] = useState([]);
@@ -102,6 +104,11 @@ export default function Locataires() {
                 ? `${loc.prenom || ''} ${loc.nom || ''}`.trim()
                 : loc.raison_sociale}
             </div>
+            {loc.type_personne === 'personne' && (loc.prenom_ar || loc.nom_ar) && (
+              <div className="small mt-1" dir="rtl" style={{ color: '#64748b' }}>
+                {`${loc.prenom_ar || ''} ${loc.nom_ar || ''}`.trim()}
+              </div>
+            )}
             {loc.type_personne === 'personne' && loc.profession_activite && (
               <div className="text-slate-500 small">{loc.profession_activite}</div>
             )}
@@ -204,15 +211,23 @@ export default function Locataires() {
       accessorKey: 'adresse_actuelle',
       header: 'Adresse',
       enableSorting: false, // Désactivé car pagination côté serveur
-      cell: ({ getValue }) => (
-        <div className="small text-slate-600 text-truncate" style={{ maxWidth: '250px' }}>
-          <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" className="me-1 text-indigo-500" style={{ marginTop: '-2px' }}>
-            <path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A31.493 31.493 0 0 1 8 14.58a31.481 31.481 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94zM8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10z"/>
-            <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-          </svg>
-          {getValue() || '-'}
-        </div>
-      ),
+      cell: ({ row, getValue }) => {
+        const loc = row.original;
+        return (
+          <div className="small text-slate-600 text-truncate" style={{ maxWidth: '250px' }}>
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" className="me-1 text-indigo-500" style={{ marginTop: '-2px' }}>
+              <path d="M12.166 8.94c-.524 1.062-1.234 2.12-1.96 3.07A31.493 31.493 0 0 1 8 14.58a31.481 31.481 0 0 1-2.206-2.57c-.726-.95-1.436-2.008-1.96-3.07C3.304 7.867 3 6.862 3 6a5 5 0 0 1 10 0c0 .862-.305 1.867-.834 2.94zM8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10z"/>
+              <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+            </svg>
+            {getValue() || '-'}
+            {loc.adresse_ar && (
+              <div className="mt-1 text-truncate" dir="rtl" style={{ color: '#64748b' }}>
+                {loc.adresse_ar}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       id: 'actions',
@@ -270,6 +285,33 @@ export default function Locataires() {
                 }}>
                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                   <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"/>
+                </svg>
+              </button>
+            )}
+            {can(PERMS.baux.create) && (
+              <button 
+                className="btn btn-sm rounded-3 border-0"
+                style={{ 
+                  width: '36px', 
+                  height: '36px', 
+                  padding: 0,
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  transition: 'all 0.2s'
+                }}
+                title="Créer un bail pour ce locataire"
+                onClick={() => navigate(`/baux/nouveau?locataire_id=${loc.id}`)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#bbf7d0';
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#dcfce7';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}>
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
+                  <path d="M8 6.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V11a.5.5 0 0 1-1 0V9.5H6a.5.5 0 0 1 0-1h1.5V7a.5.5 0 0 1 .5-.5z"/>
                 </svg>
               </button>
             )}

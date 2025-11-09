@@ -38,6 +38,46 @@ export default function Sidebar() {
       label: 'Dashboard'
     },
     {
+      path: '/mandats',
+      icon: (
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6l4-4V2a2 2 0 0 0-2-2H4z"/>
+          <path d="M10 16v-3a1 1 0 0 1 1-1h3"/>
+        </svg>
+      ),
+      label: 'Mandats'
+    },
+    {
+      path: '/avenants',
+      icon: (
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M4 1h8a1 1 0 0 1 1 1v9.5a.5.5 0 0 1-.146.354l-3.5 3.5A.5.5 0 0 1 9 15H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+          <path d="M9 15v-3a1 1 0 0 1 1-1h3"/>
+        </svg>
+      ),
+      label: 'Avenants'
+    },
+    {
+      path: '/baux',
+      icon: (
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8.5 1.866a1 1 0 0 0-1 0l-6 3.464A1 1 0 0 0 1 6.196v6.608a1 1 0 0 0 .5.866l6 3.464a1 1 0 0 0 1 0l6-3.464a1 1 0 0 0 .5-.866V6.196a1 1 0 0 0-.5-.866l-6-3.464z"/>
+          <path d="M8.5 4.134 13.5 7 8.5 9.866 3.5 7l5-2.866z" />
+        </svg>
+      ),
+      label: 'Baux'
+    },
+    {
+      path: '/remises-cles',
+      icon: (
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M3 11a5 5 0 1 1 9.584 1.99.5.5 0 0 0 .342.622l.326.094a1.5 1.5 0 0 1 1.044 1.423V16a.5.5 0 0 1-.5.5H11v-.5A1.5 1.5 0 0 0 9.5 14h-1A1.5 1.5 0 0 0 7 15.5v.5H1.5a.5.5 0 0 1-.5-.5v-2.17A1.5 1.5 0 0 1 2.044 11.9l.326-.094a.5.5 0 0 0 .342-.622A5.002 5.002 0 0 1 3 11Zm5-4a4 4 0 0 0-3.995 3.8 1.5 1.5 0 0 1-.997 1.868l-.326.094a.5.5 0 0 0-.342.622l.062.186a.5.5 0 0 0 .474.33H6v-1a2.5 2.5 0 0 1 2.5-2.5h1A2.5 2.5 0 0 1 12 13v1h2.124a.5.5 0 0 0 .474-.33l.062-.186a.5.5 0 0 0-.342-.622l-.326-.094a1.5 1.5 0 0 1-.997-1.868A4 4 0 0 0 8 7Z"/>
+          <path d="M8 9a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"/>
+        </svg>
+      ),
+      label: 'Remises clés'
+    },
+    {
       path: '/prestataires',
       icon: (
         <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
@@ -138,6 +178,14 @@ export default function Sidebar() {
         return can(PERMS.roles.view);
       case '/employes':
         return can(PERMS.users.view);
+      case '/mandats':
+        return can(PERMS.mandats.view);
+      case '/avenants':
+        return can(PERMS.avenants.view);
+      case '/baux':
+        return can(PERMS.baux.view);
+      case '/remises-cles':
+        return can(PERMS.remises_cles.view);
       default:
         return true; // dashboard, profile, etc.
     }

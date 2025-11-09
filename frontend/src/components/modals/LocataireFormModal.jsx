@@ -24,10 +24,30 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
     };
   }, [show, onHide]);
 
-  const [formData, setFormData] = useState({
+  // Normalize backend date string to input[type=date] value (YYYY-MM-DD)
+  const toInputDate = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') {
+      const m = value.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) return m[1];
+    }
+    try {
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) {
+        // Adjust to avoid timezone shift and get YYYY-MM-DD
+        const tzAdjusted = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+        return tzAdjusted.toISOString().slice(0, 10);
+      }
+    } catch (_) {}
+    return '';
+  };
+
+  const initialFormData = {
     type_personne: 'physique',
     nom: '',
+    nom_ar: '',
     prenom: '',
+    prenom_ar: '',
     raison_sociale: '',
     date_naissance: '',
     lieu_naissance: '',
@@ -41,6 +61,7 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
     ifiscale: '',
     adresse_bien_loue: '',
     adresse_actuelle: '',
+    adresse_ar: '',
     telephone: '',
     email: '',
     profession_activite: '',
@@ -52,7 +73,9 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
     exercice_annee: '',
     anciennete_mois: '',
     references_locatives: '',
-  });
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
 
   useEffect(() => {
     if (locataire) {
@@ -62,11 +85,13 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
       setFormData({
         type_personne: normalizedType,
         nom: locataire.nom || '',
+        nom_ar: locataire.nom_ar || '',
         prenom: locataire.prenom || '',
+        prenom_ar: locataire.prenom_ar || '',
         raison_sociale: locataire.raison_sociale || '',
-        date_naissance: locataire.date_naissance || '',
+        date_naissance: toInputDate(locataire.date_naissance),
         lieu_naissance: locataire.lieu_naissance || '',
-        date_creation_entreprise: locataire.date_creation_entreprise || '',
+        date_creation_entreprise: toInputDate(locataire.date_creation_entreprise),
         nationalite: locataire.nationalite || '',
         situation_familiale: locataire.situation_familiale || '',
         nb_personnes_foyer: locataire.nb_personnes_foyer || '',
@@ -76,6 +101,7 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
         ifiscale: locataire.ifiscale || '',
         adresse_bien_loue: locataire.adresse_bien_loue || '',
         adresse_actuelle: locataire.adresse_actuelle || '',
+        adresse_ar: locataire.adresse_ar || '',
         telephone: locataire.telephone || '',
         email: locataire.email || '',
         profession_activite: locataire.profession_activite || '',
@@ -88,8 +114,9 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
         anciennete_mois: locataire.anciennete_mois || '',
         references_locatives: locataire.references_locatives || '',
       });
-    } else {
-      setFormData((prev) => ({ ...prev, type_personne: 'physique' }));
+    } else if (show) {
+      // Reset completely when opening for a new locataire
+      setFormData(initialFormData);
     }
     setError('');
   }, [locataire, show]);
@@ -103,10 +130,15 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
     e.preventDefault();
     setError('');
     try {
+      // Map UI values to API values: 'physique' -> 'personne', 'morale' -> 'societe'
+      const payload = {
+        ...formData,
+        type_personne: formData.type_personne === 'physique' ? 'personne' : 'societe',
+      };
       if (isEdit) {
-        await updateLocataire({ id: locataire.id, ...formData }).unwrap();
+        await updateLocataire({ id: locataire.id, ...payload }).unwrap();
       } else {
-        await createLocataire(formData).unwrap();
+        await createLocataire(payload).unwrap();
       }
       onHide();
     } catch (err) {
@@ -166,7 +198,9 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
                     {formData.type_personne === 'physique' ? (
                       <div className="row g-3">
                         <div className="col-md-6"><label className="form-label">Nom *</label><input type="text" className="form-control" name="nom" value={formData.nom} onChange={handleChange} required /></div>
+                        <div className="col-md-6"><label className="form-label">Nom (Arabe)</label><input type="text" className="form-control" name="nom_ar" value={formData.nom_ar} onChange={handleChange} dir="rtl" /></div>
                         <div className="col-md-6"><label className="form-label">Prénom *</label><input type="text" className="form-control" name="prenom" value={formData.prenom} onChange={handleChange} required /></div>
+                        <div className="col-md-6"><label className="form-label">Prénom (Arabe)</label><input type="text" className="form-control" name="prenom_ar" value={formData.prenom_ar} onChange={handleChange} dir="rtl" /></div>
                         <div className="col-md-6"><label className="form-label">Date de naissance</label><input type="date" className="form-control" name="date_naissance" value={formData.date_naissance} onChange={handleChange} /></div>
                         <div className="col-md-6"><label className="form-label">Lieu de naissance</label><input type="text" className="form-control" name="lieu_naissance" value={formData.lieu_naissance} onChange={handleChange} /></div>
                         <div className="col-md-6"><label className="form-label">Nationalité</label><CountrySelect name="nationalite" value={formData.nationalite} onChange={handleChange} className="form-control" /></div>
@@ -202,6 +236,7 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
                       <div className="col-md-6"><label className="form-label">Téléphone *</label><input type="tel" className="form-control" name="telephone" value={formData.telephone} onChange={handleChange} required /></div>
                       <div className="col-md-6"><label className="form-label">Email</label><input type="email" className="form-control" name="email" value={formData.email} onChange={handleChange} /></div>
                       <div className="col-12"><label className="form-label">Adresse actuelle</label><textarea className="form-control" name="adresse_actuelle" value={formData.adresse_actuelle} onChange={handleChange} rows="2" /></div>
+                      <div className="col-12"><label className="form-label">Adresse (Arabe)</label><textarea className="form-control" name="adresse_ar" value={formData.adresse_ar} onChange={handleChange} rows="2" dir="rtl" /></div>
                       <div className="col-12"><label className="form-label">Adresse du bien loué</label><textarea className="form-control" name="adresse_bien_loue" value={formData.adresse_bien_loue} onChange={handleChange} rows="2" /></div>
                     </div>
                   </div>
