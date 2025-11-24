@@ -12,6 +12,7 @@ class Unite extends Model
     protected $fillable = [
         'numero_unite',
         'adresse_complete',
+        'coordonnees_gps',
         'immeuble',
         'bloc',
         'etage',
@@ -19,12 +20,10 @@ class Unite extends Model
         'superficie_m2',
         'nb_pieces',
         'nb_sdb',
+        'nb_appartements',
         'equipements',
         'mobilier',
         'statut',
-        'locataire_actuel_id',
-        'bail_actuel_id',
-        'date_entree_actuelle',
     ];
 
     protected $casts = [

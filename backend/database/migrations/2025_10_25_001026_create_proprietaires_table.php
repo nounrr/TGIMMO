@@ -13,6 +13,22 @@ return new class extends Migration
     {
         Schema::create('proprietaires', function (Blueprint $table) {
             $table->id();
+            $table->string('nom_raison');
+            $table->string('cin')->nullable();
+            $table->string('rc')->nullable();
+            $table->string('ice')->nullable();
+            $table->string('ifiscale')->nullable();
+            $table->text('adresse')->nullable();
+            $table->string('telephone')->nullable();
+            $table->string('email')->nullable();
+            $table->string('representant_nom')->nullable();
+            $table->string('representant_fonction')->nullable();
+            $table->string('representant_cin')->nullable();
+            $table->string('type_proprietaire')->default('unique');
+            $table->string('statut')->default('brouillon');
+            $table->decimal('taux_gestion_tgi_pct', 5, 2)->nullable();
+            $table->decimal('part_liquidation_pct', 5, 2)->nullable();
+            $table->text('conditions_particulieres')->nullable();
             $table->timestamps();
         });
     }

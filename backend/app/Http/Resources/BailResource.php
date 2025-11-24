@@ -22,8 +22,10 @@ class BailResource extends JsonResource
             'locataire_id' => $this->locataire_id,
             'locataire' => [
                 'id' => $this->locataire?->id,
+                'type' => $this->locataire?->type,
                 'nom' => $this->locataire?->nom,
                 'prenom' => $this->locataire?->prenom,
+                'raison_sociale' => $this->locataire?->raison_sociale,
                 'email' => $this->locataire?->email,
                 'telephone' => $this->locataire?->telephone,
             ],

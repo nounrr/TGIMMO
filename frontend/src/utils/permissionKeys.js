@@ -1,4 +1,16 @@
 export const PERMS = {
+  approches_proprietaires: {
+    view: 'approches-proprietaires.view',
+    create: 'approches-proprietaires.create',
+    update: 'approches-proprietaires.update',
+    delete: 'approches-proprietaires.delete',
+  },
+  approches_locataires: {
+    view: 'approches-locataires.view',
+    create: 'approches-locataires.create',
+    update: 'approches-locataires.update',
+    delete: 'approches-locataires.delete',
+  },
   locataires: {
     view: 'locataires.view',
     create: 'locataires.create',
@@ -47,23 +59,84 @@ export const PERMS = {
     create: 'mandats.create',
     update: 'mandats.update',
     delete: 'mandats.delete',
+    download: 'mandats.download',
   },
   avenants: {
     view: 'avenants.view',
     create: 'avenants.create',
     update: 'avenants.update',
     delete: 'avenants.delete',
+    download: 'avenants.download',
   },
   baux: {
     view: 'baux.view',
     create: 'baux.create',
     update: 'baux.update',
     delete: 'baux.delete',
+    download: 'baux.download',
   },
   remises_cles: {
     view: 'remises-cles.view',
     create: 'remises-cles.create',
     update: 'remises-cles.update',
     delete: 'remises-cles.delete',
+  },
+  reclamations: {
+    view: 'reclamations.view',
+    create: 'reclamations.create',
+    update: 'reclamations.update',
+    delete: 'reclamations.delete',
+    uploadJustif: 'reclamations.justifications.upload',
+    deleteJustif: 'reclamations.justifications.delete',
+  },
+  reclamation_types: {
+    view: 'reclamation-types.view',
+    create: 'reclamation-types.create',
+    update: 'reclamation-types.update',
+    delete: 'reclamation-types.delete',
+  },
+  interventions: {
+    view: 'interventions.view',
+    create: 'interventions.create',
+    update: 'interventions.update',
+    delete: 'interventions.delete',
+  },
+  charges: {
+    view: 'charges.view',
+    create: 'charges.create',
+    update: 'charges.update',
+    delete: 'charges.delete',
+  },
+  liquidations: {
+    view: 'liquidations.view',
+    create: 'liquidations.create',
+    update: 'liquidations.update',
+    delete: 'liquidations.delete',
+  },
+  paiements: {
+    view: 'paiements.view',
+    create: 'paiements.create',
+    update: 'paiements.update',
+    delete: 'paiements.delete',
+  },
+  unites_ownership: {
+    view: 'unites.ownership.view',
+    manage: 'unites.ownership.manage',
+  },
+  devis: {
+    view: 'devis.view',
+    create: 'devis.create',
+    update: 'devis.update',
+    delete: 'devis.delete',
+  },
+  factures: {
+    view: 'factures.view',
+    create: 'factures.create',
+    update: 'factures.update',
+    delete: 'factures.delete',
+  },
+  documents: {
+    upload: 'documents.upload',
+    delete: 'documents.delete',
   },
 };

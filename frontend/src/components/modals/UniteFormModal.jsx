@@ -422,13 +422,14 @@ export default function UniteFormModal({ show, onHide, unite }) {
         }}>
           <button
             type="button"
-            className="btn btn-lg px-4 rounded-3"
+            className="btn px-4 rounded-3"
             onClick={onHide}
             style={{
               background: '#f3f4f6',
               color: '#4b5563',
               border: 'none',
-              fontWeight: '600'
+              fontWeight: '600',
+              padding: '0.5rem 1.25rem'
             }}
           >
             Annuler
@@ -436,12 +437,13 @@ export default function UniteFormModal({ show, onHide, unite }) {
           <button
             type="submit"
             form="unite-form"
-            className="btn btn-lg px-4 text-white rounded-3"
+            className="btn px-4 text-white rounded-3"
             disabled={isCreating || isUpdating}
             style={{
               background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
               border: 'none',
-              fontWeight: '600'
+              fontWeight: '600',
+              padding: '0.5rem 1.25rem'
             }}
           >
             {isCreating || isUpdating ? (

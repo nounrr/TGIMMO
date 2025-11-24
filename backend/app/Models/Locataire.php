@@ -42,6 +42,7 @@ class Locataire extends Model
         'exercice_annee',
         'anciennete_mois',
         'references_locatives',
+        'statut',
     ];
 
     protected $casts = [

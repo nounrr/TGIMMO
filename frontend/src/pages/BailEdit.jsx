@@ -1,14 +1,24 @@
 import React from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useGetBailQuery, useUpdateBailMutation } from '../api/baseApi';
 import BailForm from './BailForm';
-import BailStatusBadge from '../components/BailStatusBadge';
+import { PERMS } from '../utils/permissionKeys';
+import useAuthz from '../hooks/useAuthz';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { FileText, KeyRound, FileDown, ArrowLeft, Pencil } from 'lucide-react';
+import BailPaymentsGrid from '../components/BailPaymentsGrid';
+import BailChargesSummary from '../components/BailChargesSummary';
+import BailChargesSquares from '../components/BailChargesSquares';
 
 export default function BailEdit() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const location = useLocation();
+  const { can } = useAuthz();
   const bailState = location.state?.bail;
-  const skipFetch = !!bailState; // if we have state, skip network fetch
+  const skipFetch = !!bailState;
   const { data, isLoading } = useGetBailQuery(id, { skip: skipFetch });
   const [updateBail, { isLoading: saving }] = useUpdateBailMutation();
 
@@ -17,169 +27,99 @@ export default function BailEdit() {
   const onSubmit = async (payload) => {
     try {
       await updateBail({ id, payload }).unwrap();
-      alert('Bail mis à jour avec succès !');
+      navigate('/baux');
     } catch (e) {
-      alert('Erreur lors de la mise à jour du bail');
       console.error(e);
+      alert('Erreur lors de la mise à jour du bail');
     }
   };
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadDocx = async () => {
     try {
       const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
       const token = localStorage.getItem('token');
-      const res = await fetch(`${base}/baux/${id}/pdf`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const res = await fetch(`${base}/baux/${id}/docx`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error('Echec du téléchargement');
       const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `bail_${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(blobUrl);
-    } catch (e) {
-      console.error(e);
-      alert("Impossible de télécharger le PDF du bail.");
-    }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `bail_${id}.docx`; document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
+    } catch (e) { console.error(e); alert("Impossible de télécharger le document du bail."); }
   };
 
   if (!bail && isLoading) {
-    return (
-      <div className="container-fluid py-5 text-center">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Chargement...</span>
-        </div>
-        <p className="text-muted mt-3">Chargement du bail...</p>
-      </div>
-    );
+    return <div className="p-8 text-center text-slate-500">Chargement du bail...</div>;
+  }
+  if (!bail) {
+    return <div className="p-8 text-center text-red-600">Bail introuvable</div>;
   }
 
-  if (!bail) {
-    return (
-      <div className="container-fluid py-5 text-center">
-        <div className="alert alert-danger d-inline-block">
-          <i className="bi bi-exclamation-triangle me-2"></i>
-          Bail introuvable
-        </div>
-      </div>
-    );
-  }
+  const statusBadge = (s) => {
+    const cfg = {
+      actif: { cls: 'bg-green-100 text-green-700', label: 'Actif' },
+      en_attente: { cls: 'bg-amber-100 text-amber-700', label: 'En attente' },
+      resilie: { cls: 'bg-red-100 text-red-700', label: 'Résilié' }
+    }[s];
+    return cfg ? <Badge variant="outline" className={`px-2 py-1 text-xs border-0 ${cfg.cls}`}>{cfg.label}</Badge> : null;
+  };
 
   return (
-    <div className="container-fluid py-4">
-      {/* Breadcrumb */}
-      <nav aria-label="breadcrumb" className="mb-3">
-        <ol className="breadcrumb">
-          <li className="breadcrumb-item"><Link to="/baux" className="text-decoration-none">Baux</Link></li>
-          <li className="breadcrumb-item active" aria-current="page">Bail #{bail.id}</li>
-        </ol>
-      </nav>
-
-      {/* Header */}
-      <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <div>
-          <h4 className="fw-bold mb-1 d-flex align-items-center gap-2">
-            <div className="bg-primary bg-opacity-10 p-2 rounded">
-              <i className="bi bi-file-text text-primary fs-5"></i>
-            </div>
-            Modifier le bail #{bail.id}
-          </h4>
-          <p className="text-muted mb-0 small">
-            <i className="bi bi-hash me-1"></i>{bail.numero_bail}
-          </p>
-        </div>
-        <div className="d-flex gap-2 align-items-center">
-          <Link className="btn btn-outline-primary d-flex align-items-center gap-2" to={`/baux/${id}/remise-cles`}>
-            <i className="bi bi-key"></i>
-            Remise de clés
-          </Link>
-          <button 
-            className="btn btn-success shadow-sm d-flex align-items-center gap-2"
-            onClick={handleDownloadPdf}
-          >
-            <i className="bi bi-file-earmark-pdf"></i>
-            Télécharger PDF
-          </button>
-          <BailStatusBadge statut={bail.statut} />
-        </div>
-      </div>
-
-      {/* Summary card */}
-      <div className="card mb-4 border-0 shadow-sm">
-        <div className="card-header bg-light border-0">
-          <h6 className="mb-0 fw-semibold">
-            <i className="bi bi-info-circle me-2"></i>Informations rapides
-          </h6>
-        </div>
-        <div className="card-body">
-          <div className="row g-4">
-            <div className="col-md-3">
-              <div className="d-flex align-items-center gap-3">
-                <div className="bg-primary bg-opacity-10 rounded p-3">
-                  <i className="bi bi-hash text-primary fs-4"></i>
-                </div>
-                <div>
-                  <div className="small text-muted mb-1">Numéro de bail</div>
-                  <div className="fw-semibold">{bail.numero_bail}</div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="d-flex align-items-center gap-3">
-                <div className="bg-info bg-opacity-10 rounded p-3">
-                  <i className="bi bi-person text-info fs-4"></i>
-                </div>
-                <div>
-                  <div className="small text-muted mb-1">Locataire</div>
-                  <div className="fw-semibold">
-                    {bail.locataire?.prenom} {bail.locataire?.nom}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="d-flex align-items-center gap-3">
-                <div className="bg-success bg-opacity-10 rounded p-3">
-                  <i className="bi bi-building text-success fs-4"></i>
-                </div>
-                <div>
-                  <div className="small text-muted mb-1">Unité</div>
-                  <div className="fw-semibold">
-                    {bail.unite?.numero_unite || bail.unite?.reference || `#${bail.unite_id}`}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-3">
-              <div className="d-flex align-items-center gap-3">
-                <div className="bg-warning bg-opacity-10 rounded p-3">
-                  <i className="bi bi-cash-stack text-warning fs-4"></i>
-                </div>
-                <div>
-                  <div className="small text-muted mb-1">Loyer total</div>
-                  <div className="fw-semibold text-success">{bail.loyer_total} MAD</div>
-                </div>
-              </div>
-            </div>
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded bg-indigo-100 text-indigo-700">{<Pencil className="h-5 w-5" />}</div>
+            <h1 className="text-xl font-semibold text-slate-900">Modifier le bail</h1>
+          </div>
+          <p className="text-sm text-slate-500">Bail #{bail.id} • {bail.numero_bail}</p>
+          <div className="flex gap-2 pt-1 items-center">
+            {statusBadge(bail.statut)}
           </div>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/baux')} className="gap-2" type="button"><ArrowLeft className="h-4 w-4" /> Retour</Button>
+          <Link to={`/baux/${id}/remise-cles`}>
+            <Button variant="outline" className="gap-2" type="button"><KeyRound className="h-4 w-4" /> Remise de clés</Button>
+          </Link>
+          <Link to={`/baux/${id}/charges`}>
+            <Button variant="outline" className="gap-2" type="button"><FileText className="h-4 w-4" /> Charges mensuelles</Button>
+          </Link>
+          {can(PERMS.baux.download) && (
+            <Button onClick={handleDownloadDocx} className="gap-2 bg-emerald-600 hover:bg-emerald-700" type="button"><FileDown className="h-4 w-4" /> DOCX</Button>
+          )}
+        </div>
       </div>
 
+      {/* Info rapide */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-semibold">Informations rapides</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <div className="space-y-1"><div className="text-slate-500">Numéro de bail</div><div className="font-medium">{bail.numero_bail || `#${bail.id}`}</div></div>
+            <div className="space-y-1"><div className="text-slate-500">Locataire</div><div className="font-medium">{bail.locataire?.prenom} {bail.locataire?.nom}</div></div>
+            <div className="space-y-1"><div className="text-slate-500">Unité</div><div className="font-medium">{bail.unite?.numero_unite || bail.unite?.reference || `#${bail.unite_id}`}</div></div>
+            <div className="space-y-1"><div className="text-slate-500">Loyer total</div><div className="font-medium text-emerald-700">{bail.loyer_total} MAD</div></div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Form */}
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-gradient text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-          <h5 className="mb-0">
-            <i className="bi bi-pencil-square me-2"></i>Formulaire de modification
-          </h5>
-        </div>
-        <div className="card-body p-4">
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-semibold">Formulaire de modification</CardTitle></CardHeader>
+        <CardContent>
           <BailForm initialValue={bail} onSubmit={onSubmit} saving={saving} />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-semibold">Paiements mensuels</CardTitle></CardHeader>
+        <CardContent>
+          <BailPaymentsGrid bail={bail} />
+        </CardContent>
+      </Card>
+
+      <BailChargesSquares bail={bail} />
+
+      <BailChargesSummary bail={bail} />
     </div>
   );
 }

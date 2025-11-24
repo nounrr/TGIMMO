@@ -5,10 +5,21 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\RemiseCle;
 use App\Models\Bail;
+use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 
 class RemiseCleController extends Controller
 {
+    use HandlesStatusPermissions;
+
+    public function __construct()
+    {
+        $this->middleware('permission:remises-cles.view')->only(['index', 'show']);
+        $this->middleware('permission:remises-cles.create')->only(['store']);
+        $this->middleware('permission:remises-cles.update')->only(['update']);
+        $this->middleware('permission:remises-cles.delete')->only(['destroy']);
+    }
+
     /**
      * Normalise la structure des clés pour un enregistrement.
      */
@@ -66,6 +77,8 @@ class RemiseCleController extends Controller
 
         $query = RemiseCle::with(['bail.locataire', 'bail.unite'])
             ->latest('date_remise');
+
+        $this->applyStatusPermissions($query, 'remises-cles');
 
         // Server-side filters
         if ($request->filled('date_from')) {

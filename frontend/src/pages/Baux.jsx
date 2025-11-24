@@ -34,11 +34,11 @@ export default function Baux() {
 
   const onChange = (field, value) => setFilters(f => ({ ...f, [field]: value }));
 
-  const handleDownloadPdf = async (bailId) => {
+  const handleDownloadDocx = async (bailId) => {
     try {
       const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
       const token = localStorage.getItem('token');
-      const res = await fetch(`${base}/baux/${bailId}/pdf`, {
+      const res = await fetch(`${base}/baux/${bailId}/docx`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error('Echec du téléchargement');
@@ -47,49 +47,44 @@ export default function Baux() {
       // Ouvrir dans un nouvel onglet et déclencher un téléchargement
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = `bail_${bailId}.pdf`;
+      a.download = `bail_${bailId}.docx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(blobUrl);
     } catch (e) {
       console.error(e);
-      alert("Impossible de télécharger le PDF du bail.");
+      alert("Impossible de télécharger le document du bail.");
     }
   };
 
   return (
-    <div className="container-fluid py-4">
+    <div className="container-fluid" style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
+      <div className="p-3">
       {/* Header */}
-      <div className="d-flex align-items-center justify-content-between mb-4">
+      <div className="d-flex align-items-center justify-content-between mb-3">
         <div>
           <h4 className="fw-bold mb-1 d-flex align-items-center gap-2">
-            <div className="bg-primary bg-opacity-10 p-2 rounded">
-              <i className="bi bi-file-text text-primary fs-5"></i>
-            </div>
+            <i className="bi bi-file-text text-primary fs-5"></i>
             Baux locatifs
           </h4>
           <p className="text-muted mb-0 small">Gérer les contrats de location</p>
         </div>
-        <Link to="/baux/nouveau" className="btn btn-primary shadow-sm">
+        <Link to="/baux/nouveau" className="btn btn-primary">
           <i className="bi bi-plus-circle me-2"></i>Nouveau bail
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="card mb-4 border-0 shadow-sm">
-        <div className="card-header bg-light border-0">
-          <h6 className="mb-0 fw-semibold">
-            <i className="bi bi-funnel me-2"></i>Filtres de recherche
-          </h6>
-        </div>
-        <div className="card-body">
-          <div className="row g-3">
+      {/* Table avec filtres intégrés */}
+      <div className="card border">
+        <div className="card-body p-3">
+          {/* Filtres */}
+          <div className="row g-2 mb-3">
             <div className="col-md-3">
-              <label className="form-label fw-semibold small">
-                <i className="bi bi-flag text-info me-1"></i>Statut
+              <label className="form-label fw-semibold small mb-1">
+                <i className="bi bi-flag me-1"></i>Statut
               </label>
-              <select className="form-select" value={filters.statut} onChange={e => onChange('statut', e.target.value)}>
+              <select className="form-select form-select-sm" value={filters.statut} onChange={e => onChange('statut', e.target.value)}>
                 <option value="">Tous les statuts</option>
                 <option value="actif">✅ Actif</option>
                 <option value="en_attente">⏳ En attente</option>
@@ -97,11 +92,11 @@ export default function Baux() {
               </select>
             </div>
             <div className="col-md-3">
-              <label className="form-label fw-semibold small">
-                <i className="bi bi-person text-primary me-1"></i>Locataire
+              <label className="form-label fw-semibold small mb-1">
+                <i className="bi bi-person me-1"></i>Locataire
               </label>
               <select 
-                className="form-select" 
+                className="form-select form-select-sm" 
                 value={filters.locataire_id} 
                 onChange={e => onChange('locataire_id', e.target.value)}
               >
@@ -115,12 +110,12 @@ export default function Baux() {
                 ))}
               </select>
             </div>
-            <div className="col-md-3">
-              <label className="form-label fw-semibold small">
-                <i className="bi bi-building text-success me-1"></i>Unité
+            <div className="col-md-4">
+              <label className="form-label fw-semibold small mb-1">
+                <i className="bi bi-building me-1"></i>Unité
               </label>
               <select 
-                className="form-select" 
+                className="form-select form-select-sm" 
                 value={filters.unite_id} 
                 onChange={e => onChange('unite_id', e.target.value)}
               >
@@ -132,20 +127,13 @@ export default function Baux() {
                 ))}
               </select>
             </div>
-            <div className="col-md-3 d-flex align-items-end">
-              <button className="btn btn-outline-secondary w-100" onClick={() => setFilters({ statut: '', locataire_id: '', unite_id: '' })} disabled={isFetching}>
-                <i className="bi bi-arrow-counterclockwise me-2"></i>Réinitialiser
+            <div className="col-md-2 d-flex align-items-end">
+              <button className="btn btn-outline-secondary btn-sm w-100" onClick={() => setFilters({ statut: '', locataire_id: '', unite_id: '' })} disabled={isFetching}>
+                <i className="bi bi-arrow-counterclockwise"></i>
               </button>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="card border-0 shadow-lg rounded-4 overflow-hidden"
-        style={{ background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(20px)' }}
-      >
-        <div className="card-body p-0">
           {isLoading ? (
             <div className="text-center py-5">
               <div className="spinner-border text-primary" role="status">
@@ -241,19 +229,21 @@ export default function Baux() {
                     <td className="px-2 py-2"><BailStatusBadge statut={b.statut} /></td>
                     <td className="text-center px-2 py-2">
                       <div className="d-flex justify-content-center gap-2">
-                        <button 
-                          className="btn btn-sm rounded-3 border-0"
-                          style={{ width: '36px', height: '36px', padding: 0, background: '#dbeafe', color: '#1e40af', transition: 'all 0.2s' }}
-                          onClick={() => handleDownloadPdf(b.id)}
-                          title="Télécharger PDF"
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#bfdbfe'; e.currentTarget.style.transform = 'scale(1.1)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.transform = 'scale(1)'; }}
-                        >
-                          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-                          </svg>
-                        </button>
+                        {can(PERMS.baux.download) && (
+                          <button 
+                            className="btn btn-sm rounded-3 border-0"
+                            style={{ width: '36px', height: '36px', padding: 0, background: '#dbeafe', color: '#1e40af', transition: 'all 0.2s' }}
+                            onClick={() => handleDownloadDocx(b.id)}
+                            title="Télécharger DOCX"
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#bfdbfe'; e.currentTarget.style.transform = 'scale(1.1)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.transform = 'scale(1)'; }}
+                          >
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                            </svg>
+                          </button>
+                        )}
                         {can(PERMS.remises_cles.create) && (
                           <button
                             className="btn btn-sm rounded-3 border-0"
@@ -303,6 +293,7 @@ export default function Baux() {
           </div>
           )}
         </div>
+      </div>
       </div>
       {remiseModalBail && (
         <RemiseCleModal

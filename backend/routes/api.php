@@ -15,6 +15,21 @@ use App\Http\Controllers\API\MandatGestionController;
 use App\Http\Controllers\API\AvenantMandatController;
 use App\Http\Controllers\API\BailController;
 use App\Http\Controllers\API\RemiseCleController;
+use App\Http\Controllers\API\ReclamationTypeController;
+use App\Http\Controllers\API\ReclamationController;
+use App\Http\Controllers\API\JustificationReclamationController;
+use App\Http\Controllers\API\InterventionController;
+use App\Http\Controllers\API\DevisController;
+use App\Http\Controllers\API\FactureController;
+use App\Http\Controllers\API\DevisDocumentController;
+use App\Http\Controllers\API\FactureDocumentController;
+use App\Http\Controllers\API\BailPaiementController;
+use App\Http\Controllers\API\BailChargesController;
+use App\Http\Controllers\ApprocheProprietaireController;
+use App\Http\Controllers\ApprocheLocataireController;
+use App\Http\Controllers\ImputationChargeController;
+use App\Http\Controllers\API\LiquidationController;
+use App\Http\Controllers\API\MaintenanceController;
 
 Route::prefix('v1')->group(function () {
     // Auth
@@ -31,6 +46,15 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:admin')->get('/admin/ping', function () {
             return response()->json(['message' => 'pong admin']);
         });
+
+        // Liquidations
+        Route::get('liquidations/pending', [LiquidationController::class, 'pending'])->middleware('can:liquidations.create');
+        Route::get('liquidations', [LiquidationController::class, 'index'])->middleware('can:liquidations.view');
+        Route::post('liquidations/preview', [LiquidationController::class, 'preview'])->middleware('can:liquidations.create');
+        Route::post('liquidations', [LiquidationController::class, 'store'])->middleware('can:liquidations.create');
+
+        // Maintenance utilities (restrict with appropriate permission)
+        Route::post('maintenance/fix-missing-ownerships', [MaintenanceController::class, 'fixMissingOwnerships'])->middleware('can:unites.update');
 
         // Locataires API (CRUD)
         Route::apiResource('locataires', LocataireController::class);
@@ -50,18 +74,57 @@ Route::prefix('v1')->group(function () {
         // Mandats de gestion (CRUD)
         Route::apiResource('mandats-gestion', MandatGestionController::class)
             ->parameters(['mandats-gestion' => 'mandats_gestion']);
+        Route::get('mandats-gestion/{mandats_gestion}/docx', [MandatGestionController::class, 'downloadDocx'])->name('mandats-gestion.docx');
 
         // Avenants au mandat (CRUD)
         Route::apiResource('avenants-mandat', AvenantMandatController::class)
             ->parameters(['avenants-mandat' => 'avenants_mandat']);
+        Route::get('avenants-mandat/{avenants_mandat}/docx', [AvenantMandatController::class, 'downloadDocx'])->name('avenants-mandat.docx');
 
         // Baux locatifs (CRUD)
         Route::apiResource('baux', BailController::class);
         Route::get('baux/{bail}/pdf', [BailController::class, 'downloadPdf'])->name('baux.pdf');
+        Route::get('baux/{bail}/docx', [BailController::class, 'downloadDocx'])->name('baux.docx');
+        // Charges mensuelles du bail
+        Route::get('baux/{bail}/charges-mensuelles', [BailChargesController::class, 'index']);
+        // Paiements mensuels du bail
+        Route::get('baux/{bail}/paiements', [BailPaiementController::class, 'index']);
+        Route::post('baux/{bail}/paiements', [BailPaiementController::class, 'store']);
+        Route::patch('paiements/{paiement}', [BailPaiementController::class, 'update']);
+        Route::post('paiements/{paiement}/valider', [BailPaiementController::class, 'valider']);
     // Remises de clés liées à un bail
     Route::get('baux/{bail}/remises-cles', [RemiseCleController::class, 'index']);
     Route::post('baux/{bail}/remises-cles', [RemiseCleController::class, 'store']);
     Route::get('remises-cles', [RemiseCleController::class, 'all']);
+
+        // Réclamations
+        Route::apiResource('reclamation-types', ReclamationTypeController::class)
+            ->parameters(['reclamation-types' => 'reclamation_type']);
+        Route::apiResource('reclamations', ReclamationController::class);
+        Route::get('reclamations/{reclamation}/docx', [ReclamationController::class, 'downloadDocx'])->name('reclamations.docx');
+        Route::post('reclamations/{reclamation}/justifications', [JustificationReclamationController::class, 'store']);
+        Route::delete('reclamations/{reclamation}/justifications/{justification}', [JustificationReclamationController::class, 'destroy']);
+
+    // Interventions (CRUD)
+    Route::apiResource('interventions', InterventionController::class);
+    Route::get('interventions/{intervention}/docx', [InterventionController::class, 'downloadDocx'])->name('interventions.docx');
+
+    // Devis & Factures (CRUD) + GED nested
+    Route::apiResource('devis', DevisController::class);
+    Route::get('devis/{devi}/docx', [DevisController::class, 'downloadDocx'])->name('devis.docx');
+    Route::post('devis/{devi}/documents', [DevisDocumentController::class, 'store']);
+
+    // Imputation Charges
+    Route::apiResource('imputation-charges', ImputationChargeController::class);
+
+    Route::apiResource('factures', FactureController::class);
+    Route::get('factures/{facture}/docx', [FactureController::class, 'downloadDocx'])->name('factures.docx');
+    Route::post('factures/{facture}/documents', [FactureDocumentController::class, 'store']);
+    Route::delete('factures/{facture}/documents/{document}', [FactureDocumentController::class, 'destroy']);
+
+        // Approches (notes / interactions) sur propriétaires & locataires
+        Route::apiResource('approche-proprietaires', ApprocheProprietaireController::class);
+        Route::apiResource('approche-locataires', ApprocheLocataireController::class);
 
         // Répartition propriétaires par unité
         Route::get('unites/{unite}/owners-groups', [UniteProprietaireController::class, 'index']);

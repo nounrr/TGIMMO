@@ -282,13 +282,14 @@ export default function UniteDetailsModal({ show, onHide, unite }) {
               background: 'linear-gradient(135deg, #f9fafb 0%, #ffffff 100%)'
             }}>
               <button
-                className="btn btn-lg px-4 rounded-3"
+                className="btn px-4 rounded-3"
                 onClick={onHide}
                 style={{
                   background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
                   color: 'white',
                   border: 'none',
-                  fontWeight: '600'
+                  fontWeight: '600',
+                  padding: '0.5rem 1.25rem'
                 }}
               >
                 Fermer

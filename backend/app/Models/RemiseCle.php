@@ -16,6 +16,7 @@ class RemiseCle extends Model
         'date_remise',
         'cles',
         'remarques',
+        'statut',
     ];
 
     protected $casts = [

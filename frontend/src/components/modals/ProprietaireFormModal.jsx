@@ -820,15 +820,16 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                 <div className="d-flex justify-content-end gap-3 pt-3">
                   <button
                     type="button"
-                    className="btn btn-lg px-4 fw-semibold"
+                    className="btn px-4 fw-semibold"
                     onClick={onHide}
                     disabled={isLoading}
                     style={{
                       background: '#f1f5f9',
                       color: '#475569',
                       border: 'none',
-                      borderRadius: '12px',
-                      transition: 'all 0.2s'
+                      borderRadius: '8px',
+                      transition: 'all 0.2s',
+                      padding: '0.5rem 1.25rem'
                     }}
                     onMouseEnter={(e) => {
                       if (!isLoading) {
@@ -845,13 +846,14 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                   </button>
                   <button
                     type="submit"
-                    className="btn btn-lg px-5 text-white fw-semibold shadow-sm d-flex align-items-center gap-2"
+                    className="btn px-4 text-white fw-semibold shadow-sm d-flex align-items-center gap-2"
                     disabled={isLoading}
                     style={{
                       background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
                       border: 'none',
-                      borderRadius: '12px',
-                      transition: 'all 0.3s'
+                      borderRadius: '8px',
+                      transition: 'all 0.3s',
+                      padding: '0.5rem 1.25rem'
                     }}
                     onMouseEnter={(e) => {
                       if (!isLoading) {

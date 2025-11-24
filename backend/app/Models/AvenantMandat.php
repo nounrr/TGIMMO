@@ -17,6 +17,7 @@ class AvenantMandat extends Model
         'date_pouvoir_initial',
         'objet_resume',
         'modifs_text',
+        'nouveau_taux_gestion',
         'date_effet',
         'lieu_signature',
         'date_signature',
@@ -30,6 +31,7 @@ class AvenantMandat extends Model
         'date_pouvoir_initial' => 'date',
         'date_effet' => 'date',
         'date_signature' => 'date',
+        'nouveau_taux_gestion' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

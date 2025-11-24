@@ -286,18 +286,18 @@ export default function UserAccessModal({ show, onHide, user }) {
             </div>
 
             <div className="modal-footer border-0 px-4 pb-4">
-              <button type="button" className="btn btn-lg px-4 fw-semibold" onClick={onHide}
-                style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '12px', transition: 'all 0.2s' }}
+              <button type="button" className="btn px-4 fw-semibold" onClick={onHide}
+                style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', transition: 'all 0.2s', padding: '0.5rem 1.25rem' }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
                 Fermer
               </button>
               {can(PERMS.users.update) || can(PERMS.users.rolesAssign) || can(PERMS.users.rolesSync) ? (
-                <button type="button" className="btn btn-lg px-5 text-white fw-semibold shadow-sm d-flex align-items-center gap-2"
+                <button type="button" className="btn px-4 text-white fw-semibold shadow-sm d-flex align-items-center gap-2"
                   disabled={saving}
                   onClick={handleSave}
-                  style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)', border: 'none', borderRadius: '12px', transition: 'all 0.3s' }}
+                  style={{ background: 'linear-gradient(135deg, #2563eb, #4f46e5)', border: 'none', borderRadius: '8px', transition: 'all 0.3s', padding: '0.5rem 1.25rem' }}
                   onMouseEnter={(e) => { if (!saving) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 16px rgba(37, 99, 235, 0.3)'; } }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
                 >

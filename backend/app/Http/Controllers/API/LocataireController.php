@@ -4,11 +4,14 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Locataire;
+use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class LocataireController extends Controller
 {
+    use HandlesStatusPermissions;
+
     public function __construct()
     {
         // Appliquer les permissions Spatie par action
@@ -25,6 +28,9 @@ class LocataireController extends Controller
     {
         $query = Locataire::query();
 
+        // Appliquer le filtrage par statut selon les permissions
+        $query = $this->applyStatusPermissions($query, 'locataires');
+
         // Recherche globale
         if ($search = $request->query('q')) {
             $query->where(function ($q) use ($search) {
@@ -39,6 +45,16 @@ class LocataireController extends Controller
         // Filtre par type de personne
         if ($type = $request->query('type')) {
             $query->where('type_personne', $type);
+        }
+
+        // Tri
+        $sortBy = $request->query('sort_by');
+        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $allowedSorts = ['nom', 'prenom', 'raison_sociale', 'type_personne', 'statut', 'email', 'telephone', 'created_at'];
+        if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->orderBy('created_at', 'desc');
         }
 
         $perPage = (int) $request->query('per_page', 15);
@@ -112,39 +128,50 @@ class LocataireController extends Controller
 
     private function validatedData(Request $request, bool $creating): array
     {
+        $user = $request->user();
+        $isCommercial = $user && $user->hasRole('commercial');
+
+        // Pour le commercial: seul le nom est requis, tous les autres champs sont optionnels
         $rules = [
             'type_personne' => ['nullable', 'in:personne,societe'],
-            'nom' => ['nullable', 'string', 'max:150'],
-            'nom_ar' => ['nullable', 'string', 'max:150'],
+            'nom' => ['required', 'string', 'max:150'], // Toujours requis
             'prenom' => ['nullable', 'string', 'max:150'],
+            'nom_ar' => ['nullable', 'string', 'max:150'],
             'prenom_ar' => ['nullable', 'string', 'max:150'],
             'raison_sociale' => ['nullable', 'string', 'max:200'],
+            'profession_activite' => ['nullable', 'string', 'max:150'],
+            'telephone' => ['nullable', 'string', 'max:20'],
+            'email' => ['nullable', 'email', 'max:150'],
+            'adresse_actuelle' => ['nullable', 'string', 'max:255'],
+            'adresse_ar' => ['nullable', 'string', 'max:255'],
+            'cin' => ['nullable', 'string', 'max:20'],
+            'rc' => ['nullable', 'string', 'max:50'],
+            'ice' => ['nullable', 'string', 'max:50'],
             'date_naissance' => ['nullable', 'date'],
             'lieu_naissance' => ['nullable', 'string', 'max:150'],
             'date_creation_entreprise' => ['nullable', 'date'],
             'nationalite' => ['nullable', 'string', 'max:100'],
-            'situation_familiale' => ['nullable', 'string', 'max:100'],
+            'situation_familiale' => ['nullable', 'in:celibataire,marie,divorce,veuf'],
             'nb_personnes_foyer' => ['nullable', 'integer', 'min:0'],
-            'cin' => ['nullable', 'string', 'max:50'],
-            'rc' => ['nullable', 'string', 'max:50'],
-            'ice' => ['nullable', 'string', 'max:50'],
             'ifiscale' => ['nullable', 'string', 'max:50'],
             'adresse_bien_loue' => ['nullable', 'string', 'max:255'],
-            'adresse_actuelle' => ['nullable', 'string', 'max:255'],
-            'adresse_ar' => ['nullable', 'string'],
-            'telephone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:150'],
-            'profession_activite' => ['nullable', 'string', 'max:150'],
             'employeur_denomination' => ['nullable', 'string', 'max:200'],
             'employeur_adresse' => ['nullable', 'string', 'max:255'],
-            'type_contrat' => ['nullable', 'in:CDI,CDD,independant,societe,autre'],
-            'revenu_mensuel_net' => ['nullable', 'numeric'],
-            'chiffre_affaires_dernier_ex' => ['nullable', 'numeric'],
-            'exercice_annee' => ['nullable', 'integer', 'digits:4'],
+            'type_contrat' => ['nullable', 'in:cdi,cdd,independant,autre'],
+            'revenu_mensuel_net' => ['nullable', 'numeric', 'min:0'],
+            'chiffre_affaires_dernier_ex' => ['nullable', 'numeric', 'min:0'],
+            'exercice_annee' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'anciennete_mois' => ['nullable', 'integer', 'min:0'],
             'references_locatives' => ['nullable', 'string'],
+            'statut' => ['nullable', 'string'],
         ];
+        
+        $data = $request->validate($rules);
 
-        return $request->validate($rules);
+        if ($creating && $isCommercial) {
+            $data['statut'] = 'en_negociation';
+        }
+
+        return $data;
     }
 }

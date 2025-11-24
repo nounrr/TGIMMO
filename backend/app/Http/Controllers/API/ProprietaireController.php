@@ -4,10 +4,13 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Proprietaire;
+use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 
 class ProprietaireController extends Controller
 {
+    use HandlesStatusPermissions;
+
     public function __construct()
     {
         $this->middleware('permission:proprietaires.view')->only(['index', 'show']);
@@ -19,6 +22,9 @@ class ProprietaireController extends Controller
     public function index(Request $request)
     {
         $query = Proprietaire::query();
+        
+        // Appliquer le filtrage par statut selon les permissions
+        $query = $this->applyStatusPermissions($query, 'proprietaires');
         
         // Filtres
         if ($search = $request->query('q')) {
@@ -48,6 +54,16 @@ class ProprietaireController extends Controller
             'total_resilie' => Proprietaire::where('statut', 'resilie')->count(),
         ];
         
+        // Tri
+        $sortBy = $request->query('sort_by');
+        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $allowedSorts = ['nom_raison', 'type_proprietaire', 'statut', 'email', 'telephone', 'created_at'];
+        if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
         $perPage = (int) $request->query('per_page', 15);
         $result = $query->paginate($perPage);
         
@@ -82,23 +98,38 @@ class ProprietaireController extends Controller
 
     private function validatedData(Request $request, bool $creating): array
     {
-        return $request->validate([
-            'nom_raison' => ['required', 'string', 'max:200'],
-            'cin' => ['nullable', 'string', 'max:50'],
+        $user = $request->user();
+        $isCommercial = $user && $user->hasRole('commercial');
+
+        // Pour le commercial: seul le nom_raison est requis, tous les autres champs sont optionnels
+        $rules = [
+            'nom_raison' => ['required', 'string', 'max:200'], // Toujours requis
+            'nom_ar' => ['nullable', 'string', 'max:200'],
+            'prenom_ar' => ['nullable', 'string', 'max:200'],
+            'type_proprietaire' => ['nullable', 'in:unique,coproprietaire,heritier,sci,autre'],
+            'statut' => ['nullable', 'string'],
+            'telephone' => ['nullable', 'string', 'max:20'],
+            'email' => ['nullable', 'email', 'max:150'],
+            'adresse' => ['nullable', 'string', 'max:255'],
+            'adresse_ar' => ['nullable', 'string', 'max:255'],
+            'cin' => ['nullable', 'string', 'max:20'],
             'rc' => ['nullable', 'string', 'max:50'],
             'ice' => ['nullable', 'string', 'max:50'],
             'ifiscale' => ['nullable', 'string', 'max:50'],
-            'adresse' => ['nullable', 'string', 'max:255'],
-            'telephone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:150'],
-            'representant_nom' => ['nullable', 'string', 'max:150'],
-            'representant_fonction' => ['nullable', 'string', 'max:120'],
-            'representant_cin' => ['nullable', 'string', 'max:50'],
-            'type_proprietaire' => ['nullable', 'in:unique,coproprietaire,heritier,sci,autre'],
-            'statut' => ['nullable', 'in:brouillon,signe,actif,resilie'],
-            'taux_gestion_tgi_pct' => ['nullable', 'numeric', 'between:0,100'],
-            'part_liquidation_pct' => ['nullable', 'numeric', 'between:0,100'],
+            'representant_nom' => ['nullable', 'string', 'max:200'],
+            'representant_fonction' => ['nullable', 'string', 'max:100'],
+            'representant_cin' => ['nullable', 'string', 'max:20'],
+            'taux_gestion_tgi_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'part_liquidation_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'conditions_particulieres' => ['nullable', 'string'],
-        ]);
+        ];
+
+        $data = $request->validate($rules);
+
+        if ($creating && $isCommercial) {
+            $data['statut'] = 'en_negociation';
+        }
+
+        return $data;
     }
 }

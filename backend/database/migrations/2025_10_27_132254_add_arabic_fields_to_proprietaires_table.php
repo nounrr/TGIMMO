@@ -12,9 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('proprietaires', function (Blueprint $table) {
-            $table->string('nom_ar')->nullable()->after('nom_raison');
-            $table->string('prenom_ar')->nullable()->after('nom_ar');
-            $table->text('adresse_ar')->nullable()->after('adresse');
+            // Colonnes Arabes ajoutAces sans contrainte de position afin d'Aviter les erreurs si les colonnes de rA(c)fA(c)rence n'existent pas encore
+            $table->string('nom_ar')->nullable();
+            $table->string('prenom_ar')->nullable();
+            $table->text('adresse_ar')->nullable();
         });
     }
 

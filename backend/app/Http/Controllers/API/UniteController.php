@@ -4,11 +4,14 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Unite;
+use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class UniteController extends Controller
 {
+    use HandlesStatusPermissions;
+
     public function __construct()
     {
         $this->middleware('permission:unites.view')->only(['index', 'show']);
@@ -20,6 +23,9 @@ class UniteController extends Controller
     public function index(Request $request)
     {
         $q = Unite::query();
+        
+        // Appliquer le filtrage par statut selon les permissions
+        $q = $this->applyStatusPermissions($q, 'unites');
         
         // Filtres
         if ($s = $request->query('q')) {
@@ -69,7 +75,37 @@ class UniteController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateData($request, true);
+        
+        $owners = $request->input('owners', []);
+        // If single owner was passed (legacy or simple form), convert to array format
+        if (empty($owners) && isset($data['proprietaire_id'])) {
+            $owners = [[
+                'proprietaire_id' => $data['proprietaire_id'],
+                'part_numerateur' => 1,
+                'part_denominateur' => 1
+            ]];
+        }
+        unset($data['proprietaire_id']); // Clean up
+
         $unite = Unite::create($data);
+
+        if (!empty($owners) && is_array($owners)) {
+            foreach ($owners as $owner) {
+                if (empty($owner['proprietaire_id'])) continue;
+                
+                $num = $owner['part_numerateur'] ?? 1;
+                $den = $owner['part_denominateur'] ?? 1;
+                $pct = ($den > 0) ? ($num / $den) * 100 : 0;
+
+                $unite->proprietaires()->attach($owner['proprietaire_id'], [
+                    'part_numerateur' => $num,
+                    'part_denominateur' => $den,
+                    // 'part_pourcent' is a generated column, do not insert manually
+                    'date_debut' => now(),
+                ]);
+            }
+        }
+
         return response()->json($unite, 201);
     }
 
@@ -96,26 +132,33 @@ class UniteController extends Controller
 
     private function validateData(Request $request, bool $creating, ?Unite $unite = null): array
     {
-        $uniqueNumero = Rule::unique('unites','numero_unite');
-        if ($unite) {
-            $uniqueNumero = $uniqueNumero->ignore($unite->id);
+        $user = $request->user();
+        $isCommercial = $user && $user->hasRole('commercial');
+
+        // Pour le commercial: seul le numero_unite est requis, tous les autres champs sont optionnels
+        $rules = [
+            'numero_unite' => ['required', 'string', 'max:50'], // Toujours requis
+            'type_unite' => ['nullable', 'in:appartement,maison,bureau,local_commercial,garage,box,terrain,autre'],
+            'adresse_complete' => ['nullable', 'string', 'max:255'],
+            'immeuble' => ['nullable', 'string', 'max:150'],
+            'bloc' => ['nullable', 'string', 'max:50'],
+            'etage' => ['nullable', 'string', 'max:50'],
+            'superficie_m2' => ['nullable', 'numeric', 'min:0'],
+            'nb_pieces' => ['nullable', 'integer', 'min:0'],
+            'nb_sdb' => ['nullable', 'integer', 'min:0'],
+            'nb_appartements' => ['nullable', 'integer', 'min:0'],
+            'statut' => ['nullable', 'string'],
+            'equipements' => ['nullable', 'string'],
+            'mobilier' => ['nullable', 'string'],
+            'proprietaire_id' => ['nullable', 'exists:proprietaires,id'],
+        ];
+
+        $data = $request->validate($rules);
+
+        if ($creating && $isCommercial) {
+            $data['statut'] = 'en_negociation';
         }
-        return $request->validate([
-            'numero_unite' => ['required','string','max:100',$uniqueNumero],
-            'adresse_complete' => ['required','string','max:255'],
-            'immeuble' => ['nullable','string','max:150'],
-            'bloc' => ['nullable','string','max:100'],
-            'etage' => ['nullable','string','max:50'],
-            'type_unite' => ['required', Rule::in(['appartement','bureau','local_commercial','garage','autre'])],
-            'superficie_m2' => ['nullable','numeric','min:0'],
-            'nb_pieces' => ['nullable','integer','min:0'],
-            'nb_sdb' => ['nullable','integer','min:0'],
-            'equipements' => ['nullable','string'],
-            'mobilier' => ['nullable','string'],
-            'statut' => ['nullable', Rule::in(['vacant','loue','maintenance','reserve'])],
-            'locataire_actuel_id' => ['nullable','integer','exists:locataires,id'],
-            'bail_actuel_id' => ['nullable','integer'],
-            'date_entree_actuelle' => ['nullable','date'],
-        ]);
+
+        return $data;
     }
 }

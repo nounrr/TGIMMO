@@ -5,25 +5,36 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
-import Locataires from './pages/Locataires';
-import Proprietaires from './pages/Proprietaires';
-import Unites from './pages/Unites';
+import LocatairesShadcn from './pages/LocatairesShadcn';
+import ProprietairesShadcn from './pages/ProprietairesShadcn';
+import UnitesShadcn from './pages/UnitesShadcn';
 import UniteOwners from './pages/UniteOwners';
-import MandatsGestion from './pages/MandatsGestion';
-import AvenantsMandat from './pages/AvenantsMandat';
-import MandatEdit from './pages/MandatEdit';
-import AvenantEdit from './pages/AvenantEdit';
-import Baux from './pages/Baux';
+import MandatsGestionShadcn from './pages/MandatsGestionShadcn';
+import AvenantsMandatShadcn from './pages/AvenantsMandatShadcn';
+import MandatEditShadcn from './pages/MandatEditShadcn';
+import AvenantEditShadcn from './pages/AvenantEditShadcn';
+import BauxShadcn from './pages/BauxShadcn';
 import BailCreate from './pages/BailCreate';
 import BailEdit from './pages/BailEdit';
-import BailRemiseCles from './pages/BailRemiseCles';
-import RemisesCles from './pages/RemisesCles';
-import RolesPermissions from './pages/RolesPermissions';
-import Employes from './pages/Employes';
-import Prestataires from './pages/Prestataires';
+import BailRemiseClesShadcn from './pages/BailRemiseClesShadcn';
+import RemisesClesShadcn from './pages/RemisesClesShadcn';
+import RolesPermissionsShadcn from './pages/RolesPermissionsShadcn';
+import EmployesShadcn from './pages/EmployesShadcn';
+import PrestataireShadcn from './pages/PrestataireShadcn';
 import './App.css';
 import AuthBootstrap from './components/AuthBootstrap';
-
+import Devis from './pages/Devis';
+import Factures from './pages/Factures';
+import ReclamationsShadcn from './pages/ReclamationsShadcn';
+import ReclamationCreate from './pages/ReclamationCreate';
+import ReclamationTypes from './pages/ReclamationTypes';
+import InterventionsShadcn from './pages/InterventionsShadcn';
+import InterventionCreate from './pages/InterventionCreate';
+import ApprochesProprietairesShadcn from './pages/ApprochesProprietairesShadcn';
+import ApprochesLocatairesShadcn from './pages/ApprochesLocatairesShadcn';
+import ChargesList from './pages/ChargesList';
+import LiquidationList from './pages/LiquidationList';
+import TestDebug from './pages/TestDebug';
 
 
 export default function App() {
@@ -31,36 +42,51 @@ export default function App() {
     <>
       <AuthBootstrap />
       <Routes>
-      {/* Si déjà connecté, rediriger /login vers /dashboard */}
-      <Route element={<GuestRoute />}> 
-        <Route path="/login" element={<Login />} />
-      </Route>
-      {/* Toutes les routes protégées avec Layout (Sidebar + BottomMenu) */}
-      <Route element={<ProtectedRoute />}> 
-        <Route element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/locataires" element={<Locataires />} />
-          <Route path="/proprietaires" element={<Proprietaires />} />
-          <Route path="/unites" element={<Unites />} />
-          <Route path="/unites/:uniteId/owners" element={<UniteOwners />} />
-          <Route path="/mandats" element={<MandatsGestion />} />
-          <Route path="/mandats/:id" element={<MandatEdit />} />
-          <Route path="/avenants" element={<AvenantsMandat />} />
-          <Route path="/avenants/:id" element={<AvenantEdit />} />
-          <Route path="/baux" element={<Baux />} />
-          <Route path="/baux/nouveau" element={<BailCreate />} />
-          <Route path="/baux/:id" element={<BailEdit />} />
-            <Route path="/baux/:id/remise-cles" element={<BailRemiseCles />} />
-            <Route path="/remises-cles" element={<RemisesCles />} />
-          <Route path="/prestataires" element={<Prestataires />} />
-          <Route path="/roles-permissions" element={<RolesPermissions />} />
-          <Route path="/employes" element={<Employes />} />
-          <Route path="*" element={<Dashboard />} />
+        {/* Si déjà connecté, rediriger /login vers /dashboard */}
+        <Route element={<GuestRoute />}>
+          <Route path="/login" element={<Login />} />
         </Route>
-      </Route>
+        {/* Toutes les routes protégées avec Layout (Sidebar + BottomMenu) */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/locataires" element={<LocatairesShadcn />} />
+            <Route path="/proprietaires" element={<ProprietairesShadcn />} />
+            <Route path="/unites" element={<UnitesShadcn />} />
+            <Route path="/unites/:uniteId/owners" element={<UniteOwners />} />
+            <Route path="/mandats" element={<MandatsGestionShadcn />} />
+            <Route path="/mandats/:id" element={<MandatEditShadcn />} />
+            <Route path="/avenants" element={<AvenantsMandatShadcn />} />
+            <Route path="/avenants/:id" element={<AvenantEditShadcn />} />
+            <Route path="/baux" element={<BauxShadcn />} />
+            <Route path="/baux/nouveau" element={<BailCreate />} />
+            <Route path="/baux/:id" element={<BailEdit />} />
+            <Route path="/baux/:id/remise-cles" element={<BailRemiseClesShadcn />} />
+            <Route path="/remises-cles" element={<RemisesClesShadcn />} />
+            <Route path="/prestataires" element={<PrestataireShadcn />} />
+            <Route path="/reclamations" element={<ReclamationsShadcn />} />
+            <Route path="/reclamations/nouveau" element={<ReclamationCreate />} />
+            <Route path="/reclamations/:id/edit" element={<ReclamationCreate />} />
+            <Route path="/reclamations/types" element={<ReclamationTypes />} />
+            <Route path="/interventions" element={<InterventionsShadcn />} />
+            <Route path="/interventions/nouveau" element={<InterventionCreate />} />
+            <Route path="/interventions/:id/edit" element={<InterventionCreate />} />
+            <Route path="/devis" element={<Devis />} />
+            <Route path="/factures" element={<Factures />} />
+            <Route path="/approches/proprietaires" element={<ApprochesProprietairesShadcn />} />
+            <Route path="/approches/locataires" element={<ApprochesLocatairesShadcn />} />
+            <Route path="/charges" element={<ChargesList />} />
+            <Route path="/liquidations" element={<LiquidationList />} />
+            <Route path="/test-debug" element={<TestDebug />} />
+            <Route path="/test-debug-top" element={<TestDebug />} />
+            <Route path="/roles-permissions" element={<RolesPermissionsShadcn />} />
+            <Route path="/employes" element={<EmployesShadcn />} />
+            <Route path="*" element={<Dashboard />} />
+          </Route>
+        </Route>
       </Routes>
     </>
   );

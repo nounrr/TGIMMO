@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('locataires', function (Blueprint $table) {
-            $table->string('nom_ar')->nullable()->after('nom');
-            $table->string('prenom_ar')->nullable()->after('prenom');
-            $table->text('adresse_ar')->nullable()->after('adresse_actuelle');
+            if (!Schema::hasColumn('locataires', 'nom_ar')) {
+                $table->string('nom_ar')->nullable();
+            }
+            if (!Schema::hasColumn('locataires', 'prenom_ar')) {
+                $table->string('prenom_ar')->nullable();
+            }
+            if (!Schema::hasColumn('locataires', 'adresse_ar')) {
+                $table->text('adresse_ar')->nullable();
+            }
         });
     }
 
@@ -23,8 +29,14 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('locataires', function (Blueprint $table) {
-            $table->dropColumn(['nom_ar', 'prenom_ar', 'adresse_ar']);
-        });
+        $toDrop = collect(['nom_ar', 'prenom_ar', 'adresse_ar'])
+            ->filter(fn ($col) => Schema::hasColumn('locataires', $col))
+            ->all();
+
+        if (!empty($toDrop)) {
+            Schema::table('locataires', function (Blueprint $table) use ($toDrop) {
+                $table->dropColumn($toDrop);
+            });
+        }
     }
 };

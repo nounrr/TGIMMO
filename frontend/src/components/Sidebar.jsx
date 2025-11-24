@@ -1,10 +1,10 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useLogoutMutation, useMeQuery } from '../features/auth/authApi';
-import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useSidebar } from '../contexts/SidebarContext';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
+import { useEffect, useState } from 'react';
 
 export default function Sidebar() {
   const [logout, { isLoading }] = useLogoutMutation();
@@ -13,6 +13,12 @@ export default function Sidebar() {
   const { data: me } = useMeQuery();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { can } = useAuthz();
+  const location = useLocation();
+  // Ouvrir par défaut Gestion locative; ouvrir Maintenance si route correspond
+  const [expandedGroups, setExpandedGroups] = useState({
+    'Gestion locative': true,
+    'Maintenance': /^(\/prestataires|\/reclamations|\/interventions|\/devis|\/factures)/.test(location.pathname)
+  });
 
   // Resolve current user (same as Profile.jsx)
   const user = me || authUser;
@@ -26,6 +32,16 @@ export default function Sidebar() {
     }
   };
 
+  const toggleGroup = (groupName) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupName]: !prev[groupName]
+    }));
+  };
+
+  // Paths à forcer visibles (debug / contournement permissions)
+  const ALWAYS_VISIBLE_PATHS = ['/liquidations', '/test-debug', '/test-debug-top'];
+
   const navItems = [
     {
       path: '/dashboard',
@@ -36,6 +52,15 @@ export default function Sidebar() {
         </svg>
       ),
       label: 'Dashboard'
+    },
+    {
+      path: '/test-debug-top',
+      icon: (
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+        </svg>
+      ),
+      label: 'Test Debug Top'
     },
     {
       path: '/mandats',
@@ -58,33 +83,157 @@ export default function Sidebar() {
       label: 'Avenants'
     },
     {
-      path: '/baux',
+      path: '/approches/proprietaires',
       icon: (
         <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M8.5 1.866a1 1 0 0 0-1 0l-6 3.464A1 1 0 0 0 1 6.196v6.608a1 1 0 0 0 .5.866l6 3.464a1 1 0 0 0 1 0l6-3.464a1 1 0 0 0 .5-.866V6.196a1 1 0 0 0-.5-.866l-6-3.464z"/>
-          <path d="M8.5 4.134 13.5 7 8.5 9.866 3.5 7l5-2.866z" />
+          <path d="M8 0a5.53 5.53 0 0 0-3.594 1.342c-.29.25-.542.523-.76.816A4.998 4.998 0 0 1 8 3c1.761 0 3.314-.906 4.354-1.842A5.53 5.53 0 0 0 8 0Z"/>
+          <path d="M13.468 6.37c-.69-.243-1.463-.371-2.218-.412A5.52 5.52 0 0 1 8 7a5.52 5.52 0 0 1-3.25-1.042c-.755.04-1.528.169-2.218.412C1.45 6.614 0 7.393 0 8.5 0 9.607 1.45 10.386 2.314 10.63c.69.243 1.463.371 2.218.412A5.52 5.52 0 0 1 8 10c1.244 0 2.41-.378 3.25-1.042.755-.04 1.528-.169 2.218-.412C14.55 8.386 16 7.607 16 6.5c0-1.107-1.45-1.886-2.532-2.13Z"/>
+          <path d="M8 11a5.53 5.53 0 0 0-3.594 1.342c-.29.25-.542.523-.76.816A4.998 4.998 0 0 1 8 14c1.761 0 3.314-.906 4.354-1.842A5.53 5.53 0 0 0 8 11Z"/>
         </svg>
       ),
-      label: 'Baux'
+      label: 'Approches Propriétaires'
     },
     {
-      path: '/remises-cles',
-      icon: (
-        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M3 11a5 5 0 1 1 9.584 1.99.5.5 0 0 0 .342.622l.326.094a1.5 1.5 0 0 1 1.044 1.423V16a.5.5 0 0 1-.5.5H11v-.5A1.5 1.5 0 0 0 9.5 14h-1A1.5 1.5 0 0 0 7 15.5v.5H1.5a.5.5 0 0 1-.5-.5v-2.17A1.5 1.5 0 0 1 2.044 11.9l.326-.094a.5.5 0 0 0 .342-.622A5.002 5.002 0 0 1 3 11Zm5-4a4 4 0 0 0-3.995 3.8 1.5 1.5 0 0 1-.997 1.868l-.326.094a.5.5 0 0 0-.342.622l.062.186a.5.5 0 0 0 .474.33H6v-1a2.5 2.5 0 0 1 2.5-2.5h1A2.5 2.5 0 0 1 12 13v1h2.124a.5.5 0 0 0 .474-.33l.062-.186a.5.5 0 0 0-.342-.622l-.326-.094a1.5 1.5 0 0 1-.997-1.868A4 4 0 0 0 8 7Z"/>
-          <path d="M8 9a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"/>
-        </svg>
-      ),
-      label: 'Remises clés'
-    },
-    {
-      path: '/prestataires',
+      path: '/approches/locataires',
       icon: (
         <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
           <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+          <path d="M1 5a4 4 0 1 1 8 0v2H7.5A1.5 1.5 0 0 0 6 8.5V9H4V7.5A1.5 1.5 0 0 0 2.5 6H1V5Z"/>
         </svg>
       ),
-      label: 'Prestataires'
+      label: 'Approches Locataires'
+    },
+    // Regroupement gestion locative
+    {
+      type: 'group',
+      label: 'Gestion locative',
+      icon: (
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8 0a5.53 5.53 0 0 0-3.594 1.342c-.29.25-.542.523-.76.816A4.998 4.998 0 0 1 8 3c1.761 0 3.314-.906 4.354-1.842A5.53 5.53 0 0 0 8 0Z"/>
+          <path d="M13.468 6.37c-.69-.243-1.463-.371-2.218-.412A5.52 5.52 0 0 1 8 7a5.52 5.52 0 0 1-3.25-1.042c-.755.04-1.528.169-2.218.412C1.45 6.614 0 7.393 0 8.5 0 9.607 1.45 10.386 2.314 10.63c.69.243 1.463.371 2.218.412A5.52 5.52 0 0 1 8 10c1.244 0 2.41-.378 3.25-1.042.755-.04 1.528-.169 2.218-.412C14.55 8.386 16 7.607 16 6.5c0-1.107-1.45-1.886-2.532-2.13Z"/>
+          <path d="M8 11a5.53 5.53 0 0 0-3.594 1.342c-.29.25-.542.523-.76.816A4.998 4.998 0 0 1 8 14c1.761 0 3.314-.906 4.354-1.842A5.53 5.53 0 0 0 8 11Z"/>
+        </svg>
+      ),
+      children: [
+        {
+          path: '/baux',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8.5 1.866a1 1 0 0 0-1 0l-6 3.464A1 1 0 0 0 1 6.196v6.608a1 1 0 0 0 .5.866l6 3.464a1 1 0 0 0 1 0l6-3.464a1 1 0 0 0 .5-.866V6.196a1 1 0 0 0-.5-.866l-6-3.464z"/>
+              <path d="M8.5 4.134 13.5 7 8.5 9.866 3.5 7l5-2.866z" />
+            </svg>
+          ),
+          label: 'Baux'
+        },
+        {
+          path: '/remises-cles',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M3 11a5 5 0 1 1 9.584 1.99.5.5 0 0 0 .342.622l.326.094a1.5 1.5 0 0 1 1.044 1.423V16a.5.5 0 0 1-.5.5H11v-.5A1.5 1.5 0 0 0 9.5 14h-1A1.5 1.5 0 0 0 7 15.5v.5H1.5a.5.5 0 0 1-.5-.5v-2.17A1.5 1.5 0 0 1 2.044 11.9l.326-.094a.5.5 0 0 0 .342-.622A5.002 5.002 0 0 1 3 11Z"/>
+              <path d="M8 9a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"/>
+            </svg>
+          ),
+          label: 'Remises clés'
+        },
+        {
+          path: '/charges',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z"/>
+            </svg>
+          ),
+          label: 'Charges'
+        },
+        {
+          path: '/liquidations',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M4 10.781c.148 1.667 1.513 2.85 3.591 3.003V15h1.043v-1.216c2.27-.179 3.678-1.438 3.678-3.3 0-1.59-.947-2.51-2.956-3.028l-.722-.187V3.467c1.122.11 1.879.714 2.07 1.616h1.47c-.166-1.6-1.54-2.748-3.54-2.875V1H7.591v1.233c-1.939.23-3.27 1.472-3.27 3.156 0 1.454.966 2.483 2.661 2.917l.61.162v4.031c-1.149-.17-1.94-.8-2.131-1.718H4zm3.391-3.836c-1.043-.263-1.6-.825-1.6-1.616 0-.944.704-1.641 1.8-1.828v3.495l-.2-.05zm1.591 1.872c1.287.323 1.852.859 1.852 1.769 0 1.097-.826 1.828-2.2 1.939V8.73l.348.086z"/>
+            </svg>
+          ),
+          label: 'Liquidations'
+        },
+        {
+          path: '/test-debug',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+            </svg>
+          ),
+          label: 'Test Debug'
+        }
+      ]
+    },
+    {
+      type: 'group',
+      label: 'Maintenance',
+      icon: (
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M6.5 1a1 1 0 0 0-1 1v1H3.5A1.5 1.5 0 0 0 2 4.5v2A1.5 1.5 0 0 0 3.5 8H5v1H3.5A1.5 1.5 0 0 0 2 10.5v2A1.5 1.5 0 0 0 3.5 14H5v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1h1.5A1.5 1.5 0 0 0 13 12.5v-2A1.5 1.5 0 0 0 11.5 9H10V8h1.5A1.5 1.5 0 0 0 13 6.5v-2A1.5 1.5 0 0 0 11.5 3H10V2a1 1 0 0 0-1-1h-2Z"/>
+          <path d="M6 8V5h4v3H6Zm0 1h4v3H6V9Z"/>
+        </svg>
+      ),
+      children: [
+        {
+          path: '/prestataires',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+            </svg>
+          ),
+          label: 'Prestataires'
+        },
+        {
+          path: '/reclamations',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 1a7 7 0 0 0-6.468 9.89c.146.305.393.558.696.68l2.665 1.066A1 1 0 0 0 6 11.714V10.5a.5.5 0 0 1 .5-.5h1c.827 0 1.5-.673 1.5-1.5V7a.5.5 0 0 1 .5-.5h1A1.5 1.5 0 0 0 13 5V4a3 3 0 0 0-3-3H8Z"/>
+              <path d="M2.908 12.317A7 7 0 0 0 14.98 9.39 7 7 0 0 1 8 15v1.5a.5.5 0 0 1-.854.354l-4-4a.5.5 0 0 1 .262-.837l.5-.2Z"/>
+            </svg>
+          ),
+          label: 'Réclamations'
+        },
+        {
+          path: '/reclamations/types',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M2 2a1 1 0 0 1 1-1h4.586a1 1 0 0 1 .707.293l7 7a1 1 0 0 1 0 1.414l-4.586 4.586a1 1 0 0 1-1.414 0l-7-7A1 1 0 0 1 2 6.586V2zm3.5 4a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+            </svg>
+          ),
+          label: 'Types de réclamations'
+        },
+        {
+          path: '/interventions',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M6.5 1a1 1 0 0 0-1 1v1H3.5A1.5 1.5 0 0 0 2 4.5v2A1.5 1.5 0 0 0 3.5 8H5v1H3.5A1.5 1.5 0 0 0 2 10.5v2A1.5 1.5 0 0 0 3.5 14H5v1a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1h1.5A1.5 1.5 0 0 0 13 12.5v-2A1.5 1.5 0 0 0 11.5 9H10V8h1.5A1.5 1.5 0 0 0 13 6.5v-2A1.5 1.5 0 0 0 11.5 3H10V2a1 1 0 0 0-1-1h-2Z"/>
+              <path d="M6 8V5h4v3H6Zm0 1h4v3H6V9Z"/>
+            </svg>
+          ),
+          label: 'Interventions'
+        },
+        {
+          path: '/devis',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M4 0a2 2 0 0 0-2 2v11.293A1 1 0 0 0 2.293 14l2.853 2.853A1 1 0 0 0 6 17.293V16h6a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
+              <path d="M8.5 4.5a.5.5 0 0 1 .5.5v.5H10a.5.5 0 0 1 0 1H9v.5a.5.5 0 0 1-1 0V6H7a.5.5 0 0 1 0-1h1V5a.5.5 0 0 1 .5-.5z"/>
+              <path d="M5 10.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+          ),
+          label: 'Devis'
+        },
+        {
+          path: '/factures',
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M2 1a1 1 0 0 0-1 1v12.5a.5.5 0 0 0 .757.429L4 13.071l2.243 1.858a.5.5 0 0 0 .614 0L9.1 13.428l2.286 1.858A.5.5 0 0 0 12 14.5V2a1 1 0 0 0-1-1H2z"/>
+              <path d="M3 3h8v2H3V3zm0 3h8v2H3V6zm0 3h5v2H3V9z"/>
+            </svg>
+          ),
+          label: 'Factures'
+        }
+      ]
     },
     {
       path: '/employes',
@@ -164,32 +313,107 @@ export default function Sidebar() {
     return 'Utilisateur';
   };
 
-  const allowedNavItems = navItems.filter((item) => {
-    switch (item.path) {
-      case '/locataires':
-        return can(PERMS.locataires.view);
-      case '/proprietaires':
-        return can(PERMS.proprietaires.view);
-      case '/unites':
-        return can(PERMS.unites.view);
-      case '/prestataires':
-        return can(PERMS.prestataires.view);
-      case '/roles-permissions':
-        return can(PERMS.roles.view);
-      case '/employes':
-        return can(PERMS.users.view);
-      case '/mandats':
-        return can(PERMS.mandats.view);
-      case '/avenants':
-        return can(PERMS.avenants.view);
-      case '/baux':
-        return can(PERMS.baux.view);
-      case '/remises-cles':
-        return can(PERMS.remises_cles.view);
-      default:
-        return true; // dashboard, profile, etc.
+  const filterNavItems = (items) => {
+    const result = items.reduce((acc, item) => {
+      if (item.type === 'group') {
+        const filteredChildren = item.children.filter(child => {
+          // Toujours garder les paths forcés
+          if (ALWAYS_VISIBLE_PATHS.includes(child.path)) return true;
+          switch (child.path) {
+            case '/baux':
+              return can(PERMS.baux.view);
+            case '/remises-cles':
+              return can(PERMS.remises_cles.view);
+            case '/charges':
+              return can(PERMS.charges.view);
+            case '/prestataires':
+              return can(PERMS.prestataires.view);
+            case '/reclamations':
+            case '/reclamations/types':
+              return can(PERMS.reclamations.view);
+            case '/interventions':
+              return can(PERMS.interventions.view);
+            case '/devis':
+              return can(PERMS.devis.view);
+            case '/factures':
+              return can(PERMS.factures.view);
+            default:
+              return true;
+          }
+        });
+        // Conserver le groupe s'il contient au moins un enfant OU si un des ALWAYS_VISIBLE appartient au groupe original
+        if (filteredChildren.length > 0) {
+          acc.push({ ...item, children: filteredChildren });
+        }
+        return acc;
+      }
+      // Top-level items
+      const allowed = (() => {
+        // Forcer visibilité si dans ALWAYS_VISIBLE_PATHS
+        if (ALWAYS_VISIBLE_PATHS.includes(item.path)) return true;
+        switch (item.path) {
+          case '/locataires':
+            return can(PERMS.locataires.view);
+          case '/proprietaires':
+            return can(PERMS.proprietaires.view);
+          case '/unites':
+            return can(PERMS.unites.view);
+          case '/roles-permissions':
+            return can(PERMS.roles.view);
+          case '/employes':
+            return can(PERMS.users.view);
+          case '/mandats':
+            return can(PERMS.mandats.view);
+          case '/avenants':
+            return can(PERMS.avenants.view);
+          case '/approches/proprietaires':
+            return can(PERMS.approches_proprietaires.view);
+          case '/approches/locataires':
+            return can(PERMS.approches_locataires.view);
+          default:
+            return true;
+        }
+      })();
+      if (allowed) acc.push(item);
+      return acc;
+    }, []);
+
+    // Fallback: injecter top-level si jamais pas présent (sécurité supplémentaire)
+    const ensurePath = (path, label) => {
+      const exists = result.some(i => i.path === path || (i.type === 'group' && i.children?.some(c => c.path === path)));
+      if (!exists) {
+        result.push({
+          path,
+          icon: (
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+            </svg>
+          ),
+          label
+        });
+      }
+    };
+
+    ensurePath('/liquidations', 'Liquidations');
+    ensurePath('/test-debug', 'Test Debug');
+
+    return result;
+  };
+
+  // Debug: log permissions once
+  useEffect(() => {
+    if (user) {
+      console.log('[DEBUG] User permissions:', user.permissions || user.all_permissions || []);
+      console.log('[DEBUG] liquidations.view allowed?', can(PERMS.liquidations.view));
     }
-  });
+  }, [user, can]);
+
+  const allowedNavItems = filterNavItems(navItems);
+
+  // Debug logs
+  console.log('[DEBUG] allowedNavItems:', allowedNavItems);
+  console.log('[DEBUG] expandedGroups:', expandedGroups);
+  console.log('[DEBUG] isCollapsed:', isCollapsed);
 
   return (
     <aside className="d-none d-lg-flex flex-column position-fixed top-0 start-0 vh-100 shadow-lg"
@@ -272,7 +496,7 @@ export default function Sidebar() {
                 <img 
                   src={user.photo_url} 
                   alt={getFullName()}
-                  className="rounded-circle border border-2"
+                  className="rounded-circle border-2"
                   style={{
                     width: isCollapsed ? '40px' : '56px',
                     height: isCollapsed ? '40px' : '56px',
@@ -283,7 +507,7 @@ export default function Sidebar() {
                 />
               ) : (
                 <div 
-                  className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white border border-2"
+                  className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white border-2"
                   style={{
                     width: isCollapsed ? '40px' : '56px',
                     height: isCollapsed ? '40px' : '56px',
@@ -298,7 +522,7 @@ export default function Sidebar() {
               )}
               {/* Online indicator */}
               <div 
-                className="position-absolute rounded-circle border border-2 border-white"
+                className="position-absolute rounded-circle border-2 border-white"
                 style={{
                   width: '12px',
                   height: '12px',
@@ -327,41 +551,133 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-grow-1 p-3 overflow-auto">
         <div className="d-flex flex-column gap-1">
-          {allowedNavItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => 
-                `d-flex align-items-center ${isCollapsed ? 'justify-content-center' : 'gap-3'} px-3 py-3 rounded-3 text-decoration-none transition-all ${
-                  isActive 
-                    ? 'text-white shadow-sm' 
-                    : 'text-dark hover-item'
-                }`
-              }
-              style={({ isActive }) => ({
-                background: isActive 
-                  ? 'linear-gradient(135deg, #2563eb, #4f46e5)' 
-                  : 'transparent',
-                transition: 'all 0.3s ease',
-                fontWeight: isActive ? '600' : '500'
-              })}
-              onMouseEnter={(e) => {
-                if (!e.currentTarget.classList.contains('text-white')) {
-                  e.currentTarget.style.background = 'rgba(37, 99, 235, 0.08)';
-                  e.currentTarget.style.transform = isCollapsed ? 'scale(1.05)' : 'translateX(4px)';
+          {allowedNavItems.map((item, idx) => {
+            if (item.type === 'group') {
+              const isExpanded = expandedGroups[item.label];
+              return (
+                <div key={`group-${idx}`}>
+                  {/* Group Header */}
+                  <button
+                    onClick={() => toggleGroup(item.label)}
+                    className={`w-100 d-flex align-items-center ${isCollapsed ? 'justify-content-center' : 'justify-content-between'} px-3 py-3 rounded-3 text-decoration-none border-0 bg-transparent text-dark`}
+                    style={{
+                      transition: 'all 0.3s ease',
+                      fontWeight: '600',
+                      background: isExpanded ? 'rgba(37, 99, 235, 0.08)' : 'transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isExpanded) {
+                        e.currentTarget.style.background = 'rgba(37, 99, 235, 0.08)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isExpanded) {
+                        e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
+                  >
+                    <div className={`d-flex align-items-center ${isCollapsed ? 'justify-content-center' : 'gap-3'}`}>
+                      {item.icon}
+                      {!isCollapsed && <span>{item.label}</span>}
+                    </div>
+                    {!isCollapsed && (
+                      <svg 
+                        width="16" 
+                        height="16" 
+                        fill="currentColor" 
+                        viewBox="0 0 16 16"
+                        style={{
+                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.3s ease'
+                        }}
+                      >
+                        <path fillRule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                      </svg>
+                    )}
+                  </button>
+                  
+                  {/* Group Children */}
+                  {isExpanded && !isCollapsed && (
+                    <div className="ms-3 mt-1 d-flex flex-column gap-1">
+                      {item.children.map((child) => (
+                        <NavLink
+                          key={child.path}
+                          to={child.path}
+                          className={({ isActive }) => 
+                            `d-flex align-items-center gap-3 px-3 py-2 rounded-3 text-decoration-none transition-all ${
+                              isActive 
+                                ? 'text-white shadow-sm' 
+                                : 'text-dark hover-item'
+                            }`
+                          }
+                          style={({ isActive }) => ({
+                            background: isActive 
+                              ? 'linear-gradient(135deg, #2563eb, #4f46e5)' 
+                              : 'transparent',
+                            transition: 'all 0.3s ease',
+                            fontWeight: isActive ? '600' : '500',
+                            fontSize: '0.9rem'
+                          })}
+                          onMouseEnter={(e) => {
+                            if (!e.currentTarget.classList.contains('text-white')) {
+                              e.currentTarget.style.background = 'rgba(37, 99, 235, 0.08)';
+                              e.currentTarget.style.transform = 'translateX(4px)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!e.currentTarget.classList.contains('text-white')) {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.transform = 'translateX(0)';
+                            }
+                          }}
+                        >
+                          {child.icon}
+                          <span>{child.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Regular menu item
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) => 
+                  `d-flex align-items-center ${isCollapsed ? 'justify-content-center' : 'gap-3'} px-3 py-3 rounded-3 text-decoration-none transition-all ${
+                    isActive 
+                      ? 'text-white shadow-sm' 
+                      : 'text-dark hover-item'
+                  }`
                 }
-              }}
-              onMouseLeave={(e) => {
-                if (!e.currentTarget.classList.contains('text-white')) {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.transform = 'translateX(0) scale(1)';
-                }
-              }}
-            >
-              {item.icon}
-              {!isCollapsed && <span>{item.label}</span>}
-            </NavLink>
-          ))}
+                style={({ isActive }) => ({
+                  background: isActive 
+                    ? 'linear-gradient(135deg, #2563eb, #4f46e5)' 
+                    : 'transparent',
+                  transition: 'all 0.3s ease',
+                  fontWeight: isActive ? '600' : '500'
+                })}
+                onMouseEnter={(e) => {
+                  if (!e.currentTarget.classList.contains('text-white')) {
+                    e.currentTarget.style.background = 'rgba(37, 99, 235, 0.08)';
+                    e.currentTarget.style.transform = isCollapsed ? 'scale(1.05)' : 'translateX(4px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!e.currentTarget.classList.contains('text-white')) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.transform = 'translateX(0) scale(1)';
+                  }
+                }}
+              >
+                {item.icon}
+                {!isCollapsed && <span>{item.label}</span>}
+              </NavLink>
+            );
+          })}
         </div>
       </nav>
 

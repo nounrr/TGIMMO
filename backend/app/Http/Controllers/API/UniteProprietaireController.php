@@ -15,6 +15,12 @@ use Illuminate\Support\Facades\DB;
 
 class UniteProprietaireController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('permission:unites.ownership.view')->only(['index']);
+        $this->middleware('permission:unites.ownership.manage')->only(['store']);
+    }
+
     private function findLatestMandatIdFor(int $proprietaireId): ?int
     {
         $mandat = MandatGestion::where('proprietaire_id', $proprietaireId)

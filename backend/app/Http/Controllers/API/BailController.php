@@ -6,19 +6,35 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\BailResource;
 use App\Models\Bail;
 use App\Models\Unite;
+use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Barryvdh\DomPDF\Facade\Pdf;
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\IOFactory;
 
 class BailController extends Controller
 {
+    use HandlesStatusPermissions;
+
+    public function __construct()
+    {
+        $this->middleware('permission:baux.view')->only(['index', 'show']);
+        $this->middleware('permission:baux.create')->only(['store']);
+        $this->middleware('permission:baux.update')->only(['update']);
+        $this->middleware('permission:baux.delete')->only(['destroy']);
+        $this->middleware('permission:baux.download')->only(['downloadPdf', 'downloadDocx']);
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $query = Bail::with(['locataire', 'unite']);
+        $query = Bail::with(['locataire', 'unite', 'unite.proprietaires']);
+
+        $this->applyStatusPermissions($query, 'baux');
 
         // Filtres optionnels
         if ($request->filled('statut')) {
@@ -33,7 +49,13 @@ class BailController extends Controller
             $query->where('unite_id', $request->unite_id);
         }
 
-        $baux = $query->orderBy('date_debut', 'desc')->paginate(20);
+        if ($request->filled('search')) {
+            $query->search($request->get('search'));
+        }
+
+        $perPage = (int) $request->get('per_page', 20);
+        if ($perPage <= 0) { $perPage = 20; }
+        $baux = $query->orderBy('date_debut', 'desc')->paginate($perPage);
 
         return BailResource::collection($baux);
     }
@@ -226,5 +248,220 @@ class BailController extends Controller
         $filename = 'bail_' . $bail->numero_bail . '_' . date('Ymd') . '.pdf';
         
         return $pdf->download($filename);
+    }
+
+    /**
+     * Download bail as DOCX
+     */
+    public function downloadDocx(string $id)
+    {
+        $bail = Bail::with(['locataire', 'unite.proprietaires'])->findOrFail($id);
+        
+        // Create PhpWord document
+        $phpWord = new PhpWord();
+        
+        // Define styles
+        $phpWord->addFontStyle('titleStyle', ['bold' => true, 'size' => 18, 'name' => 'Arial']);
+        $phpWord->addFontStyle('headerStyle', ['bold' => true, 'size' => 13, 'name' => 'Arial', 'color' => '1F4788']);
+        $phpWord->addFontStyle('subHeaderStyle', ['bold' => true, 'size' => 11, 'name' => 'Arial']);
+        $phpWord->addFontStyle('normalStyle', ['size' => 11, 'name' => 'Arial']);
+        $phpWord->addFontStyle('boldStyle', ['bold' => true, 'size' => 11, 'name' => 'Arial']);
+        $phpWord->addParagraphStyle('centerAlign', ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 240]);
+        $phpWord->addParagraphStyle('justified', ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::BOTH, 'spaceAfter' => 120]);
+        $phpWord->addParagraphStyle('leftAlign', ['spaceAfter' => 120]);
+        
+        $section = $phpWord->addSection([
+            'marginTop' => 1000,
+            'marginBottom' => 1000,
+            'marginLeft' => 1200,
+            'marginRight' => 1200,
+        ]);
+        
+        // Title
+        $section->addText(
+            'CONTRAT DE BAIL',
+            'titleStyle',
+            'centerAlign'
+        );
+        
+        $section->addTextBreak(1);
+        
+        // Numero de bail
+        if ($bail->numero_bail) {
+            $section->addText('N° ' . $bail->numero_bail, 'headerStyle', 'centerAlign');
+            $section->addTextBreak(1);
+        }
+        
+        // Section 1: Les parties
+        $section->addText('ENTRE LES SOUSSIGNÉS :', 'headerStyle');
+        $section->addTextBreak(1);
+        
+        // Bailleur (propriétaire)
+        $section->addText('LE BAILLEUR :', 'subHeaderStyle');
+        if ($bail->unite && $bail->unite->proprietaires && $bail->unite->proprietaires->isNotEmpty()) {
+            foreach ($bail->unite->proprietaires as $prop) {
+                $section->addText($prop->nom_raison ?: '', 'normalStyle');
+                if ($prop->cin) {
+                    $section->addText('CIN : ' . $prop->cin, 'normalStyle');
+                }
+                if ($prop->adresse_complete) {
+                    $section->addText('Adresse : ' . $prop->adresse_complete, 'normalStyle');
+                }
+            }
+        }
+        
+        $section->addTextBreak(1);
+        
+        // Preneur (locataire)
+        $section->addText('LE PRENEUR :', 'subHeaderStyle');
+        if ($bail->locataire) {
+            $section->addText(($bail->locataire->nom ?: '') . ' ' . ($bail->locataire->prenom ?: ''), 'normalStyle');
+            if ($bail->locataire->cin) {
+                $section->addText('CIN : ' . $bail->locataire->cin, 'normalStyle');
+            }
+            if ($bail->locataire->telephone) {
+                $section->addText('Téléphone : ' . $bail->locataire->telephone, 'normalStyle');
+            }
+            if ($bail->locataire->email) {
+                $section->addText('Email : ' . $bail->locataire->email, 'normalStyle');
+            }
+        }
+        
+        $section->addTextBreak(1);
+        
+        // Section 2: Désignation du bien
+        $section->addText('I. DÉSIGNATION DU BIEN LOUÉ', 'headerStyle');
+        $section->addTextBreak(1);
+        
+        if ($bail->unite) {
+            if ($bail->unite->numero_unite) {
+                $section->addText('Unité N° : ' . $bail->unite->numero_unite, 'normalStyle');
+            }
+            if ($bail->unite->type_bien) {
+                $section->addText('Type : ' . ucfirst($bail->unite->type_bien), 'normalStyle');
+            }
+            if ($bail->unite->superficie_m2) {
+                $section->addText('Superficie : ' . number_format($bail->unite->superficie_m2, 2) . ' m²', 'normalStyle');
+            }
+            if ($bail->unite->adresse_complete) {
+                $section->addText('Adresse : ' . $bail->unite->adresse_complete, 'normalStyle');
+            }
+            if ($bail->unite->immeuble) {
+                $section->addText('Immeuble : ' . $bail->unite->immeuble, 'normalStyle');
+            }
+            if ($bail->unite->etage) {
+                $section->addText('Étage : ' . $bail->unite->etage, 'normalStyle');
+            }
+        }
+        
+        $section->addTextBreak(1);
+        
+        // Section 3: Durée du bail
+        $section->addText('II. DURÉE DU BAIL', 'headerStyle');
+        $section->addTextBreak(1);
+        
+        $section->addText('Date de début : ' . date('d/m/Y', strtotime($bail->date_debut)), 'normalStyle');
+        if ($bail->date_fin) {
+            $section->addText('Date de fin : ' . date('d/m/Y', strtotime($bail->date_fin)), 'normalStyle');
+        }
+        if ($bail->duree_mois) {
+            $section->addText('Durée : ' . $bail->duree_mois . ' mois', 'normalStyle');
+        }
+        
+        $section->addTextBreak(1);
+        
+        // Section 4: Loyer et charges
+        $section->addText('III. LOYER ET CHARGES', 'headerStyle');
+        $section->addTextBreak(1);
+        
+        if ($bail->montant_loyer) {
+            $section->addText('Loyer mensuel : ' . number_format($bail->montant_loyer, 2) . ' MAD', 'boldStyle');
+        }
+        if ($bail->montant_charges) {
+            $section->addText('Charges mensuelles : ' . number_format($bail->montant_charges, 2) . ' MAD', 'normalStyle');
+        }
+        if ($bail->montant_depot_garantie) {
+            $section->addText('Dépôt de garantie : ' . number_format($bail->montant_depot_garantie, 2) . ' MAD', 'normalStyle');
+        }
+        if ($bail->periodicite_paiement) {
+            $section->addText('Périodicité de paiement : ' . ucfirst($bail->periodicite_paiement), 'normalStyle');
+        }
+        
+        $section->addTextBreak(1);
+        
+        // Section 5: Usage du bien
+        if ($bail->usage_prevu) {
+            $section->addText('IV. USAGE DU BIEN', 'headerStyle');
+            $section->addTextBreak(1);
+            $section->addText('Usage prévu : ' . ucfirst($bail->usage_prevu), 'normalStyle');
+            $section->addTextBreak(1);
+        }
+        
+        // Section 6: Clauses particulières
+        if ($bail->clauses_particulieres) {
+            $section->addText('V. CLAUSES PARTICULIÈRES', 'headerStyle');
+            $section->addTextBreak(1);
+            $section->addText($bail->clauses_particulieres, 'normalStyle', 'justified');
+            $section->addTextBreak(1);
+        }
+        
+        // Section 7: Dispositions générales
+        $section->addText('VI. DISPOSITIONS GÉNÉRALES', 'headerStyle');
+        $section->addTextBreak(1);
+        
+        if ($bail->renouvellement_auto) {
+            $section->addText('Renouvellement automatique : Oui', 'normalStyle');
+        }
+        if ($bail->indexation_loyer) {
+            $section->addText('Indexation du loyer : Oui', 'normalStyle');
+        }
+        
+        $section->addTextBreak(2);
+        
+        // Signature section
+        $section->addText('SIGNATURES', 'headerStyle');
+        $section->addTextBreak(1);
+        
+        // Create table for signatures
+        $table = $section->addTable([
+            'borderSize' => 0,
+            'cellMargin' => 50,
+            'width' => 100 * 50,
+        ]);
+        
+        $table->addRow();
+        $cell1 = $table->addCell(5000);
+        $cell1->addText('Le Bailleur', 'boldStyle');
+        $cell1->addTextBreak(3);
+        if ($bail->unite && $bail->unite->proprietaires && $bail->unite->proprietaires->isNotEmpty()) {
+            $cell1->addText($bail->unite->proprietaires->first()->nom_raison ?: '', 'normalStyle');
+        }
+        
+        $cell2 = $table->addCell(5000);
+        $cell2->addText('Le Preneur', 'boldStyle');
+        $cell2->addTextBreak(3);
+        if ($bail->locataire) {
+            $cell2->addText(($bail->locataire->nom ?: '') . ' ' . ($bail->locataire->prenom ?: ''), 'normalStyle');
+        }
+        
+        // Lieu et date de signature
+        if ($bail->lieu_signature || $bail->date_signature) {
+            $section->addTextBreak(2);
+            $signatureInfo = 'Fait à ';
+            $signatureInfo .= $bail->lieu_signature ?: '________________';
+            $signatureInfo .= ', le ';
+            $signatureInfo .= $bail->date_signature ? date('d/m/Y', strtotime($bail->date_signature)) : date('d/m/Y');
+            $section->addText($signatureInfo, 'normalStyle');
+        }
+        
+        // Generate filename
+        $filename = 'bail_' . $bail->numero_bail . '.docx';
+        
+        // Save to temporary file
+        $tempFile = tempnam(sys_get_temp_dir(), 'bail_');
+        $objWriter = IOFactory::createWriter($phpWord, 'Word2007');
+        $objWriter->save($tempFile);
+        
+        return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
     }
 }

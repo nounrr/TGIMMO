@@ -138,9 +138,9 @@ export default function PrestataireDetailsModal({ show, onHide, prestataire }) {
             <div className="modal-footer border-0 px-4 pb-4">
               <button
                 type="button"
-                className="btn btn-lg px-5 fw-semibold"
+                className="btn px-4 fw-semibold"
                 onClick={onHide}
-                style={{ background: 'linear-gradient(135deg, #e0e7ff, #ede9fe)', color: '#4338ca', border: 'none', borderRadius: '12px', transition: 'all 0.2s' }}
+                style={{ background: 'linear-gradient(135deg, #e0e7ff, #ede9fe)', color: '#4338ca', border: 'none', borderRadius: '8px', transition: 'all 0.2s', padding: '0.5rem 1.25rem' }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'linear-gradient(135deg, #c7d2fe, #ddd6fe)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'linear-gradient(135deg, #e0e7ff, #ede9fe)'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
