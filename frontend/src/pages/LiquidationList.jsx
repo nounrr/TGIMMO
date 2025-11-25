@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, FileText, Calculator, Check, ArrowRight } from 'lucide-react';
+import { Plus, Search, FileText, Calculator, Check, ArrowRight, ArrowUpDown } from 'lucide-react';
 import useAuthz from '@/hooks/useAuthz';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +24,8 @@ export default function LiquidationList() {
     annee: new Date().getFullYear().toString(),
   });
   const [historyPage, setHistoryPage] = useState(1);
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
 
   // Filters for Pending
   const [pendingFilters, setPendingFilters] = useState({
@@ -41,7 +43,9 @@ export default function LiquidationList() {
     per_page: 15,
     ...historyFilters,
     mois: historyFilters.mois === 'all' ? undefined : historyFilters.mois,
-  }), [historyPage, historyFilters]);
+    sort_by: sortBy,
+    sort_dir: sortDir,
+  }), [historyPage, historyFilters, sortBy, sortDir]);
 
   const { data: historyData, isLoading: isHistoryLoading } = useGetLiquidationsQuery(historyParams, { skip: activeTab !== 'history' });
   const historyLiquidations = historyData?.data || [];
@@ -54,6 +58,15 @@ export default function LiquidationList() {
   const handleHistoryFilterChange = (key, value) => {
     setHistoryFilters(prev => ({ ...prev, [key]: value }));
     setHistoryPage(1);
+  };
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('asc');
+    }
   };
 
   const handlePendingFilterChange = (key, value) => {
@@ -253,9 +266,15 @@ export default function LiquidationList() {
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead>Propriétaire</TableHead>
-                    <TableHead>Période</TableHead>
-                    <TableHead className="text-right">Net Versé</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('mois')}>
+                      Période {sortBy === 'mois' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => handleSort('net_a_payer')}>
+                      Net Versé {sortBy === 'net_a_payer' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
+                      Date {sortBy === 'created_at' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                    </TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>

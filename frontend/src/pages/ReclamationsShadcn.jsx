@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Plus, Search, Filter, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { AlertTriangle, Plus, Search, Filter, AlertCircle, CheckCircle, XCircle, Clock, ArrowUpDown } from 'lucide-react';
 
 export default function ReclamationsShadcn() {
   const { can } = useAuthz();
@@ -18,13 +18,17 @@ export default function ReclamationsShadcn() {
   const [status, setStatus] = useState('all');
   const [typeId, setTypeId] = useState('all');
   const [bailId, setBailId] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   const params = useMemo(() => ({
     q: q || undefined,
     status: status !== 'all' ? status : undefined,
     reclamation_type_id: typeId !== 'all' ? typeId : undefined,
     bail_id: bailId !== 'all' ? bailId : undefined,
-  }), [q, status, typeId, bailId]);
+    sort_by: sortBy,
+    order: sortOrder,
+  }), [q, status, typeId, bailId, sortBy, sortOrder]);
 
   const { data: recData, isLoading } = useGetReclamationsQuery(params);
   const list = recData?.data || [];
@@ -46,7 +50,7 @@ export default function ReclamationsShadcn() {
     const c = cfg[st] || { color: 'bg-slate-100 text-slate-700', icon: AlertCircle, label: st };
     const Icon = c.icon;
     return (
-      <Badge variant="outline" className={`${c.color} border-0 flex items-center gap-1`}>
+      <Badge variant="outline" className={`${c.color} border-0 flex items-center gap-1 w-fit`}>
         <Icon className="h-3 w-3" />
         {c.label}
       </Badge>
@@ -81,7 +85,7 @@ export default function ReclamationsShadcn() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Recherche</Label>
               <div className="relative">
@@ -123,6 +127,30 @@ export default function ReclamationsShadcn() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Trier par</Label>
+              <div className="flex gap-2">
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Trier par" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at">Date création</SelectItem>
+                    <SelectItem value="updated_at">Date modification</SelectItem>
+                    <SelectItem value="status">Statut</SelectItem>
+                    <SelectItem value="date_reclamation">Date réclamation</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  title={sortOrder === 'asc' ? "Croissant" : "Décroissant"}
+                >
+                  <ArrowUpDown className={`h-4 w-4 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -158,7 +186,9 @@ export default function ReclamationsShadcn() {
                 list.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">#{item.id}</TableCell>
-                    <TableCell className="font-medium">{item.sujet}</TableCell>
+                    <TableCell className="font-medium truncate max-w-[200px]" title={item.description}>
+                      {item.description}
+                    </TableCell>
                     <TableCell>
                       {item.bail ? (
                         <div className="flex flex-col">

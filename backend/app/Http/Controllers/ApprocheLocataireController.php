@@ -29,7 +29,15 @@ class ApprocheLocataireController extends Controller
         if ($request->filled('locataire_id')) {
             $query->where('locataire_id', $request->get('locataire_id'));
         }
-        return JsonResource::collection($query->orderByDesc('id')->paginate($request->get('per_page', 15)));
+        if ($sortBy = $request->query('sort_by')) {
+            $direction = $request->query('order', 'asc');
+            if (in_array($sortBy, ['created_at', 'updated_at', 'description', 'statut'])) {
+                $query->orderBy($sortBy, $direction);
+            }
+        } else {
+            $query->orderByDesc('id');
+        }
+        return JsonResource::collection($query->paginate($request->get('per_page', 15)));
     }
 
     public function store(Request $request)

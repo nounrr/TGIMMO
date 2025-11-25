@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { useCreateInterventionMutation, useUpdateInterventionMutation, useGetBauxQuery, useGetInterventionsQuery, useGetInterventionQuery } from '../api/baseApi';
+import ReactSelect from 'react-select';
+import { useCreateInterventionMutation, useUpdateInterventionMutation, useGetBauxQuery, useGetInterventionsQuery, useGetInterventionQuery, useGetInterventionNaturesQuery } from '../api/baseApi';
 import { useGetPrestatairesQuery } from '../features/prestataires/prestatairesApi';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
@@ -8,7 +9,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -20,9 +20,11 @@ export default function InterventionCreate() {
   const { id } = useParams();
   const location = useLocation();
   const isEdit = !!id;
-  const { data: bauxData } = useGetBauxQuery({ per_page: 1000, with: 'locataire,unite' });
+  const { data: bauxData } = useGetBauxQuery({ per_page: 1000, with: 'locataire,unite.proprietaires' });
   const baux = bauxData?.data || [];
   const { data: interventionsData } = useGetInterventionsQuery({ per_page: 1000 });
+  const { data: naturesData } = useGetInterventionNaturesQuery();
+  const naturesProblemes = naturesData || [];
   const { data: prestatairesData } = useGetPrestatairesQuery({ per_page: 1000 });
   const prestataires = prestatairesData?.data || [];
   const interventionFromState = location.state?.intervention;
@@ -30,22 +32,53 @@ export default function InterventionCreate() {
   const [updateInter, { isLoading: isUpdating }] = useUpdateInterventionMutation();
 
   const [form, setForm] = useState({
-    bail_id: '', locataire_id: '', proprietaire_id: '', prestataire_id: '', reclamation_id: '',
+    bail_id: '', prestataire_id: '', reclamation_id: '',
     demandeur_nom_societe: '', demandeur_service: '', demandeur_telephone: '', demandeur_email: '',
     date_demande: '', urgence: 'normal', nature_probleme: '', localisation: '', symptomes: '', pieces_materiel: '', actions_effectuees: '', date_planifiee: '', status: 'ouvert', charge: ''
   });
   const [error, setError] = useState(null);
   const [selectedBail, setSelectedBail] = useState(null);
   const [isLocataireDemandeur, setIsLocataireDemandeur] = useState(false);
-  const [natureProblemeMode, setNatureProblemeMode] = useState('select');
-  const [naturesProblemes, setNaturesProblemes] = useState([]);
 
-  useEffect(() => {
-    if (interventionsData?.data) {
-      const natures = [...new Set(interventionsData.data.map(i => i.nature_probleme).filter(n => n && n.trim() !== ''))].sort();
-      setNaturesProblemes(natures);
-    }
-  }, [interventionsData]);
+  // Options for ReactSelect
+  const bauxOptions = useMemo(() => baux.map(b => {
+    const locataireLabel = b.locataire?.type === 'personne' 
+      ? `${b.locataire?.prenom || ''} ${b.locataire?.nom || ''}`.trim() 
+      : b.locataire?.raison_sociale || '';
+      
+    const proprietaires = b.unite?.proprietaires || [];
+    const proprietairesLabel = proprietaires.length > 0
+      ? proprietaires.map(p => p.type === 'personne' ? `${p.prenom} ${p.nom}` : p.raison_sociale).join(', ')
+      : 'Aucun propriétaire';
+
+    return {
+      value: String(b.id),
+      label: `${(b.numero_bail || `#${b.id}`)} – Loc: ${locataireLabel} – Prop: ${proprietairesLabel}`
+    };
+  }), [baux]);
+
+  const prestatairesOptions = useMemo(() => [
+    { value: 'none', label: 'Aucun technicien assigné' },
+    ...prestataires.map(p => ({
+      value: String(p.id),
+      label: `${(p.nom_raison || p.nom || 'Sans nom')}${p.domaine_activite ? ` - ${p.domaine_activite}` : ''}`
+    }))
+  ], [prestataires]);
+
+  const urgenceOptions = [
+    { value: 'urgent', label: 'Urgent' },
+    { value: 'normal', label: 'Normal' },
+    { value: 'planifie', label: 'Planifié' }
+  ];
+
+  const statusOptions = [
+    { value: 'ouvert', label: 'Ouvert' },
+    { value: 'planifie', label: 'Planifié' },
+    { value: 'en_cours', label: 'En cours' },
+    { value: 'resolu', label: 'Résolu' },
+    { value: 'ferme', label: 'Fermé' },
+    { value: 'annule', label: 'Annulé' }
+  ];
 
   if (isEdit) {
     if (!can(PERMS.interventions.update)) return <div className="p-6 text-red-500">Accès refusé</div>;
@@ -81,11 +114,9 @@ export default function InterventionCreate() {
       const i = sourceIntervention;
       setForm(f => ({
         ...f,
-        bail_id: i.bail_id ? String(i.bail_id) : '',
-        locataire_id: i.locataire_id || '',
-        proprietaire_id: i.proprietaire_id || '',
-        prestataire_id: i.prestataire_id ? String(i.prestataire_id) : '',
-        reclamation_id: i.reclamation_id || '',
+        bail_id: i.bail?.id ? String(i.bail.id) : (i.bail_id ? String(i.bail_id) : ''),
+        prestataire_id: i.prestataire?.id ? String(i.prestataire.id) : (i.prestataire_id ? String(i.prestataire_id) : ''),
+        reclamation_id: i.reclamation?.id ? String(i.reclamation.id) : (i.reclamation_id || ''),
         demandeur_nom_societe: i.demandeur_nom_societe || '',
         demandeur_service: i.demandeur_service || '',
         demandeur_telephone: i.demandeur_telephone || '',
@@ -119,11 +150,10 @@ export default function InterventionCreate() {
     setForm(f => ({
       ...f,
       bail_id: bailId,
-      locataire_id: bail?.locataire?.id || '',
       demandeur_nom_societe: '',
       demandeur_telephone: '',
       demandeur_email: '',
-      demandeur_service: ''
+      demandeur_service: bail?.unite?.reference || bail?.unite?.numero_unite || ''
     }));
     setIsLocataireDemandeur(false);
   };
@@ -138,6 +168,8 @@ export default function InterventionCreate() {
         demandeur_nom_societe: nomComplet,
         demandeur_telephone: loc.telephone || '',
         demandeur_email: loc.email || '',
+        // demandeur_service is already set by handleBailChange and should not be overwritten here unless necessary, 
+        // but since it's read-only based on bail, we can keep it as is or re-affirm it.
         demandeur_service: selectedBail.unite?.reference || selectedBail.unite?.numero_unite || ''
       }));
     } else if (!checked) {
@@ -146,7 +178,8 @@ export default function InterventionCreate() {
         demandeur_nom_societe: '',
         demandeur_telephone: '',
         demandeur_email: '',
-        demandeur_service: ''
+        // Keep the service/unit info even if unchecked, as it relates to the bail, not just the locataire checkbox
+        demandeur_service: selectedBail?.unite?.reference || selectedBail?.unite?.numero_unite || ''
       }));
     }
   };
@@ -211,43 +244,39 @@ export default function InterventionCreate() {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Bail *</Label>
-              <Select value={form.bail_id} onValueChange={handleBailChange}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner un bail" /></SelectTrigger>
-                <SelectContent>
-                  {baux.map(b => (
-                    <SelectItem key={b.id} value={String(b.id)}>
-                      {(b.numero_bail || `#${b.id}`)} – {b.locataire?.type === 'personne' ? `${b.locataire?.prenom || ''} ${b.locataire?.nom || ''}`.trim() : b.locataire?.raison_sociale || ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ReactSelect
+                options={bauxOptions}
+                value={bauxOptions.find(opt => opt.value === form.bail_id) || null}
+                onChange={(opt) => handleBailChange(opt ? opt.value : '')}
+                placeholder="Sélectionner un bail..."
+                isClearable
+                menuPlacement="bottom"
+                className="text-sm"
+              />
               {selectedBail && <div className="text-xs text-green-600">Unité: {selectedBail.unite?.reference || selectedBail.unite?.numero_unite || '—'}</div>}
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Urgence</Label>
-              <Select value={form.urgence} onValueChange={val => setForm(f => ({ ...f, urgence: val }))}>
-                <SelectTrigger className="w-full" />
-                <SelectContent>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="planifie">Planifié</SelectItem>
-                </SelectContent>
-              </Select>
+              <ReactSelect
+                options={urgenceOptions}
+                value={urgenceOptions.find(opt => opt.value === form.urgence)}
+                onChange={(opt) => setForm(f => ({ ...f, urgence: opt ? opt.value : 'normal' }))}
+                placeholder="Sélectionner urgence..."
+                menuPlacement="bottom"
+                className="text-sm"
+              />
             </div>
             {isEdit && (
               <div className="space-y-1">
                 <Label className="text-xs font-semibold">Statut</Label>
-                <Select value={form.status} onValueChange={val => setForm(f => ({ ...f, status: val }))}>
-                  <SelectTrigger className="w-full" />
-                  <SelectContent>
-                    <SelectItem value="ouvert">Ouvert</SelectItem>
-                    <SelectItem value="planifie">Planifié</SelectItem>
-                    <SelectItem value="en_cours">En cours</SelectItem>
-                    <SelectItem value="resolu">Résolu</SelectItem>
-                    <SelectItem value="ferme">Fermé</SelectItem>
-                    <SelectItem value="annule">Annulé</SelectItem>
-                  </SelectContent>
-                </Select>
+                <ReactSelect
+                  options={statusOptions}
+                  value={statusOptions.find(opt => opt.value === form.status)}
+                  onChange={(opt) => setForm(f => ({ ...f, status: opt ? opt.value : 'ouvert' }))}
+                  placeholder="Sélectionner statut..."
+                  menuPlacement="bottom"
+                  className="text-sm"
+                />
               </div>
             )}
             <div className="space-y-1">
@@ -276,15 +305,15 @@ export default function InterventionCreate() {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Technicien / Prestataire</Label>
-              <Select value={form.prestataire_id === '' ? 'none' : form.prestataire_id} onValueChange={val => setForm(f => ({ ...f, prestataire_id: val === 'none' ? '' : val }))}>
-                <SelectTrigger className="w-full" />
-                <SelectContent>
-                  <SelectItem value="none">Aucun technicien assigné</SelectItem>
-                  {prestataires.map(p => (
-                    <SelectItem key={p.id} value={String(p.id)}>{(p.nom_raison || p.nom || 'Sans nom')}{p.domaine_activite ? ` - ${p.domaine_activite}` : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ReactSelect
+                options={prestatairesOptions}
+                value={prestatairesOptions.find(opt => opt.value === (form.prestataire_id || 'none'))}
+                onChange={(opt) => setForm(f => ({ ...f, prestataire_id: opt && opt.value !== 'none' ? opt.value : '' }))}
+                placeholder="Sélectionner un technicien..."
+                isClearable
+                menuPlacement="bottom"
+                className="text-sm"
+              />
               {form.prestataire_id && <div className="text-xs text-green-600">Technicien assigné</div>}
               {!prestataires.length && <div className="text-xs text-amber-600">Aucun prestataire disponible</div>}
             </div>
@@ -300,7 +329,7 @@ export default function InterventionCreate() {
           <CardHeader><CardTitle className="text-sm font-semibold">Demandeur</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1"><Label className="text-xs font-semibold">Nom / Société {isLocataireDemandeur && form.bail_id && <span className="text-green-600">(locataire)</span>}</Label><Input value={form.demandeur_nom_societe} readOnly={isLocataireDemandeur && !!form.bail_id} onChange={e => setForm(f => ({ ...f, demandeur_nom_societe: e.target.value }))} /></div>
-            <div className="space-y-1"><Label className="text-xs font-semibold">Service / Appartement / Bureau</Label><Input value={form.demandeur_service} onChange={e => setForm(f => ({ ...f, demandeur_service: e.target.value }))} /></div>
+            <div className="space-y-1"><Label className="text-xs font-semibold">Service / Appartement / Bureau</Label><Input value={form.demandeur_service} readOnly={!!form.bail_id} onChange={e => setForm(f => ({ ...f, demandeur_service: e.target.value }))} /></div>
             <div className="space-y-1"><Label className="text-xs font-semibold">Téléphone {isLocataireDemandeur && form.bail_id && <span className="text-green-600">(locataire)</span>}</Label><Input value={form.demandeur_telephone} readOnly={isLocataireDemandeur && !!form.bail_id} onChange={e => setForm(f => ({ ...f, demandeur_telephone: e.target.value }))} /></div>
             <div className="space-y-1"><Label className="text-xs font-semibold">E-mail {isLocataireDemandeur && form.bail_id && <span className="text-green-600">(locataire)</span>}</Label><Input type="email" value={form.demandeur_email} readOnly={isLocataireDemandeur && !!form.bail_id} onChange={e => setForm(f => ({ ...f, demandeur_email: e.target.value }))} /></div>
           </CardContent>
@@ -311,26 +340,18 @@ export default function InterventionCreate() {
           <CardHeader><CardTitle className="text-sm font-semibold">Description du problème</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Nature du problème *</Label>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant={natureProblemeMode === 'select' ? 'default' : 'outline'} onClick={() => { setNatureProblemeMode('select'); setForm(f => ({ ...f, nature_probleme: '' })); }}>Liste</Button>
-                  <Button type="button" size="sm" variant={natureProblemeMode === 'custom' ? 'default' : 'outline'} onClick={() => { setNatureProblemeMode('custom'); setForm(f => ({ ...f, nature_probleme: '' })); }}>Personnalisé</Button>
-                </div>
-              </div>
-              {natureProblemeMode === 'select' ? (
-                <Select value={form.nature_probleme} onValueChange={val => setForm(f => ({ ...f, nature_probleme: val }))}>
-                  <SelectTrigger className="w-full" />
-                  <SelectContent>
-                    {naturesProblemes.map((nature, idx) => (
-                      <SelectItem key={idx} value={nature}>{nature}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input value={form.nature_probleme} onChange={e => setForm(f => ({ ...f, nature_probleme: e.target.value }))} placeholder="Ex: Fuite d'eau, Panne électrique..." />
-              )}
-              {natureProblemeMode === 'select' && !naturesProblemes.length && <div className="text-xs text-slate-500">Aucune nature enregistrée, utilisez Personnalisé.</div>}
+              <Label className="text-xs font-semibold">Nature du problème *</Label>
+              <Input 
+                value={form.nature_probleme} 
+                onChange={e => setForm(f => ({ ...f, nature_probleme: e.target.value }))} 
+                placeholder="Ex: Fuite d'eau, Panne électrique..." 
+                list="natures-list"
+              />
+              <datalist id="natures-list">
+                {naturesProblemes.map((nature, idx) => (
+                  <option key={idx} value={nature} />
+                ))}
+              </datalist>
             </div>
             <div className="space-y-1"><Label className="text-xs font-semibold">Localisation précise</Label><Input value={form.localisation} onChange={e => setForm(f => ({ ...f, localisation: e.target.value }))} /></div>
             <div className="space-y-1"><Label className="text-xs font-semibold">Symptômes ou détails</Label><Textarea rows={3} value={form.symptomes} onChange={e => setForm(f => ({ ...f, symptomes: e.target.value }))} /></div>

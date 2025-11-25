@@ -49,13 +49,15 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
-import { Search, Plus, Edit, Trash2, Phone, Mail, Wrench, CreditCard } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Phone, Mail, Wrench, CreditCard, ArrowUpDown } from 'lucide-react';
 
 export default function PrestataireShadcn() {
   const { can } = useAuthz();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDomaine, setSelectedDomaine] = useState('all');
+  const [sortBy, setSortBy] = useState('nom_raison');
+  const [sortDir, setSortDir] = useState('asc');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -78,7 +80,18 @@ export default function PrestataireShadcn() {
     per_page: pagination.pageSize,
     q: searchTerm || undefined,
     domaine_activite: selectedDomaine !== 'all' ? selectedDomaine : undefined,
-  }), [pagination.pageIndex, pagination.pageSize, searchTerm, selectedDomaine]);
+    sort_by: sortBy,
+    sort_dir: sortDir,
+  }), [pagination.pageIndex, pagination.pageSize, searchTerm, selectedDomaine, sortBy, sortDir]);
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('asc');
+    }
+  };
 
   const { data, isLoading } = useGetPrestatairesQuery(queryParams);
   const [createPrestataire, { isLoading: isCreating }] = useCreatePrestataireMutation();
@@ -205,7 +218,7 @@ export default function PrestataireShadcn() {
             <Search className="h-4 w-4" />
             Filtres
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <Label htmlFor="search" className="text-sm font-medium mb-1.5 block text-left">
                 Recherche
@@ -236,6 +249,30 @@ export default function PrestataireShadcn() {
               </SelectContent>
             </Select>
             </div>
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block text-left">Trier par</Label>
+              <div className="flex gap-2">
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Trier par" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at">Date création</SelectItem>
+                    <SelectItem value="updated_at">Date modification</SelectItem>
+                    <SelectItem value="nom_raison">Nom / Raison</SelectItem>
+                    <SelectItem value="domaine_activite">Domaine</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+                  title={sortDir === 'asc' ? "Croissant" : "Décroissant"}
+                >
+                  <ArrowUpDown className={`h-4 w-4 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -246,11 +283,21 @@ export default function PrestataireShadcn() {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50">
-                <TableHead>Nom / Raison sociale</TableHead>
-                <TableHead>Domaine d'activité</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>RC / ICE</TableHead>
+                <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('nom_raison')}>
+                  Nom / Raison sociale {sortBy === 'nom_raison' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('domaine_activite')}>
+                  Domaine d'activité {sortBy === 'domaine_activite' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('contact_nom')}>
+                  Contact {sortBy === 'contact_nom' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('email')}>
+                  Email {sortBy === 'email' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('rc')}>
+                  RC / ICE {sortBy === 'rc' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>

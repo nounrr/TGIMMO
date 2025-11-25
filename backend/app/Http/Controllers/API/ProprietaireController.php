@@ -44,6 +44,15 @@ class ProprietaireController extends Controller
         if ($statut = $request->query('statut')) {
             $query->where('statut', $statut);
         }
+
+        if ($sortBy = $request->query('sort_by')) {
+            $direction = $request->query('order', 'asc');
+            if (in_array($sortBy, ['created_at', 'updated_at', 'nom_raison', 'cin', 'email'])) {
+                $query->orderBy($sortBy, $direction);
+            }
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
         
         // Statistiques globales (indépendantes des filtres)
         $stats = [

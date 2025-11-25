@@ -104,7 +104,7 @@ export default function ProprietairesShadcn() {
     type: selectedType === 'all' ? undefined : selectedType,
     statut: selectedStatut === 'all' ? undefined : selectedStatut,
     sort_by: sortBy,
-    sort_dir: sortDir,
+    order: sortDir,
   }), [pagination, searchTerm, selectedType, selectedStatut, sortBy, sortDir]);
 
   const handleSort = (column) => {
@@ -306,6 +306,26 @@ export default function ProprietairesShadcn() {
                 <SelectItem value="en_negociation">En négociation</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at">Date création</SelectItem>
+                <SelectItem value="updated_at">Date modification</SelectItem>
+                <SelectItem value="nom_raison">Nom / Raison</SelectItem>
+                <SelectItem value="cin">CIN</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+              title={sortDir === 'asc' ? "Croissant" : "Décroissant"}
+            >
+              <ArrowUpDown className={`h-4 w-4 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+            </Button>
           </div>
 
           <div className="rounded-md border">

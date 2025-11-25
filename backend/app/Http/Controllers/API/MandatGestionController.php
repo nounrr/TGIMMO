@@ -51,6 +51,17 @@ class MandatGestionController extends Controller
             $query->whereDate('date_debut', '<=', $to);
         }
 
+        // Tri
+        $sortBy = $request->query('sort_by');
+        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $allowedSorts = ['reference', 'date_debut', 'date_fin', 'statut', 'created_at'];
+        
+        if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
         $perPage = (int) $request->query('per_page', 15);
         $result = $query->paginate($perPage);
 

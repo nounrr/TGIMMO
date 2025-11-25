@@ -1,12 +1,14 @@
 import React from 'react';
+import { Badge } from "@/components/ui/badge";
 
 const map = {
-  actif: { className: 'badge bg-success-subtle text-success border border-success-subtle', label: 'Actif' },
-  en_attente: { className: 'badge bg-warning-subtle text-warning border border-warning-subtle', label: 'En attente' },
-  resilie: { className: 'badge bg-danger-subtle text-danger border border-danger-subtle', label: 'Résilié' },
+  actif: { className: 'bg-green-100 text-green-700 hover:bg-green-100 border-green-200', label: 'Actif' },
+  en_attente: { className: 'bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200', label: 'En attente' },
+  resilie: { className: 'bg-red-100 text-red-700 hover:bg-red-100 border-red-200', label: 'Résilié' },
+  termine: { className: 'bg-slate-100 text-slate-700 hover:bg-slate-100 border-slate-200', label: 'Terminé' },
 };
 
 export default function BailStatusBadge({ statut }) {
-  const cfg = map[statut] || { className: 'badge bg-secondary-subtle text-secondary', label: statut };
-  return <span className={cfg.className}>{cfg.label}</span>;
+  const cfg = map[statut] || { className: 'bg-slate-100 text-slate-700 hover:bg-slate-100', label: statut };
+  return <Badge variant="outline" className={`${cfg.className} border`}>{cfg.label}</Badge>;
 }

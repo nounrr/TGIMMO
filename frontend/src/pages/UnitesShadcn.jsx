@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useGetUnitesQuery,
+  useGetImmeublesQuery,
   useCreateUniteMutation,
   useUpdateUniteMutation,
   useDeleteUniteMutation,
@@ -112,6 +113,7 @@ export default function UnitesShadcn() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedStatut, setSelectedStatut] = useState('all');
+  const [selectedImmeuble, setSelectedImmeuble] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
@@ -177,11 +179,14 @@ export default function UnitesShadcn() {
     q: searchTerm,
     type_unite: selectedType === 'all' ? undefined : selectedType,
     statut: selectedStatut === 'all' ? undefined : selectedStatut,
+    immeuble: selectedImmeuble === 'all' ? undefined : selectedImmeuble,
     sort_by: sortBy,
     sort_dir: sortDir,
-  }), [pagination, searchTerm, selectedStatut, selectedType, sortBy, sortDir]);
+  }), [pagination, searchTerm, selectedStatut, selectedType, selectedImmeuble, sortBy, sortDir]);
 
   const { data, isLoading, isFetching, refetch } = useGetUnitesQuery(queryParams);
+  const { data: immeublesData } = useGetImmeublesQuery();
+  const immeubles = immeublesData || [];
   const [createUnite, { isLoading: isCreating }] = useCreateUniteMutation();
   const [updateUnite, { isLoading: isUpdating }] = useUpdateUniteMutation();
   const [deleteUnite, { isLoading: isDeleting }] = useDeleteUniteMutation();
@@ -440,6 +445,17 @@ export default function UnitesShadcn() {
                 <SelectItem value="Terrain">Terrain</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={selectedImmeuble} onValueChange={setSelectedImmeuble}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Immeuble" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les immeubles</SelectItem>
+                {immeubles.map((imm, idx) => (
+                  <SelectItem key={idx} value={imm}>{imm}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={selectedStatut} onValueChange={setSelectedStatut}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Statut" />
@@ -453,6 +469,25 @@ export default function UnitesShadcn() {
                 <SelectItem value="en_negociation">En négociation</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at">Date création</SelectItem>
+                <SelectItem value="updated_at">Date modification</SelectItem>
+                <SelectItem value="numero_unite">N° Unité</SelectItem>
+                <SelectItem value="immeuble">Immeuble</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+              title={sortDir === 'asc' ? "Croissant" : "Décroissant"}
+            >
+              <ArrowUpDown className={`h-4 w-4 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+            </Button>
           </div>
 
           <div className="rounded-md border">

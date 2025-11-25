@@ -15,8 +15,6 @@ class StoreInterventionRequest extends FormRequest
     {
         return [
             'bail_id' => ['nullable','exists:baux,id'],
-            'locataire_id' => ['nullable','exists:locataires,id'],
-            'proprietaire_id' => ['nullable','exists:proprietaires,id'],
             'prestataire_id' => ['nullable','exists:prestataires,id'],
             'reclamation_id' => ['nullable','exists:reclamations,id'],
 

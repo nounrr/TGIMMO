@@ -9,21 +9,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import Select from 'react-select';
-import { FileText, Plus, Search, Filter, RefreshCw, User, Eye, Edit } from 'lucide-react';
+import { FileText, Plus, Search, Filter, RefreshCw, User, Eye, Edit, ArrowUpDown } from 'lucide-react';
 
 export default function MandatsGestionShadcn() {
   const [q, setQ] = useState('');
   const [proprietaireId, setProprietaireId] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
   
-  const queryParams = {};
+  const queryParams = {
+    sort_by: sortBy,
+    sort_dir: sortDir,
+  };
   if (q) queryParams.q = q;
   if (proprietaireId && proprietaireId !== 'all') queryParams.proprietaire_id = proprietaireId;
   
-  const { data, isFetching, refetch } = useGetMandatsQuery(Object.keys(queryParams).length > 0 ? queryParams : undefined);
+  const { data, isFetching, refetch } = useGetMandatsQuery(queryParams);
   const { data: proprietairesData } = useGetProprietairesQuery({ per_page: 1000 });
   
   const rows = data?.data || data || [];
   const proprietaires = proprietairesData?.data || [];
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('asc');
+    }
+  };
 
   const customSelectStyles = {
     control: (provided, state) => ({
@@ -138,11 +152,19 @@ export default function MandatsGestionShadcn() {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50 hover:bg-slate-50">
-                <TableHead>Référence</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('reference')}>
+                  Référence {sortBy === 'reference' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
                 <TableHead>Propriétaire</TableHead>
-                <TableHead>Date Début</TableHead>
-                <TableHead>Date Fin</TableHead>
-                <TableHead>Statut</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('date_debut')}>
+                  Date Début {sortBy === 'date_debut' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('date_fin')}>
+                  Date Fin {sortBy === 'date_fin' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('statut')}>
+                  Statut {sortBy === 'statut' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>

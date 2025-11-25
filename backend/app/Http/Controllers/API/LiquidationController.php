@@ -30,6 +30,17 @@ class LiquidationController extends Controller
             $query->where('mois', $request->mois);
         }
 
+        // Tri
+        $sortBy = $request->query('sort_by');
+        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $allowedSorts = ['mois', 'annee', 'total_recettes', 'total_depenses', 'net_a_payer', 'created_at'];
+        
+        if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
         return response()->json($query->paginate($request->per_page ?? 15));
     }
 

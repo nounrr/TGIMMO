@@ -12,21 +12,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Select from 'react-select';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Download, Search, Filter, RefreshCw, KeyRound, Pencil, Trash2 } from 'lucide-react';
+import { FileText, Plus, Download, Search, Filter, RefreshCw, KeyRound, Pencil, Trash2, ArrowUpDown } from 'lucide-react';
 import BailStatusBadge from '../components/BailStatusBadge';
 
 export default function BauxShadcn() {
   const { can } = useAuthz();
   const [filters, setFilters] = useState({ statut: '', locataire_id: '', unite_id: '', search: '' });
+  const [sortBy, setSortBy] = useState('date_debut');
+  const [sortDir, setSortDir] = useState('desc');
 
   const queryParams = useMemo(() => {
-    const qp = {};
+    const qp = {
+      sort_by: sortBy,
+      sort_dir: sortDir,
+    };
     if (filters.statut) qp.statut = filters.statut;
     if (filters.locataire_id) qp.locataire_id = filters.locataire_id;
     if (filters.unite_id) qp.unite_id = filters.unite_id;
     if (filters.search) qp.search = filters.search;
     return qp;
-  }, [filters]);
+  }, [filters, sortBy, sortDir]);
 
   const { data, isLoading, isFetching } = useGetBauxQuery(queryParams);
   const [deleteBail, { isLoading: isDeleting }] = useDeleteBailMutation();
@@ -38,6 +43,15 @@ export default function BauxShadcn() {
   const baux = data?.data || data || [];
 
   const onChange = (k, v) => setFilters(f => ({ ...f, [k]: v === 'all' ? '' : v }));
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('asc');
+    }
+  };
 
   const handleDownloadDocx = async (bailId) => {
     try {
@@ -184,13 +198,21 @@ export default function BauxShadcn() {
             <TableHeader>
               <TableRow className="bg-slate-50 hover:bg-slate-50">
                 <TableHead>#</TableHead>
-                <TableHead>Numéro</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('numero_bail')}>
+                  Numéro {sortBy === 'numero_bail' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
                 <TableHead>Locataire</TableHead>
                 <TableHead>Unité</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Loyer (MAD)</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Statut</TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('montant_loyer')}>
+                  Loyer (MAD) {sortBy === 'montant_loyer' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('date_debut')}>
+                  Dates {sortBy === 'date_debut' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => handleSort('statut')}>
+                  Statut {sortBy === 'statut' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                </TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>

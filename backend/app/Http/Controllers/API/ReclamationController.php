@@ -35,7 +35,15 @@ class ReclamationController extends Controller
                 $q->where('description','like',"%$search%");
             });
         }
-        $recs = $query->latest()->paginate(25);
+        if ($sortBy = $request->query('sort_by')) {
+            $direction = $request->query('order', 'asc');
+            if (in_array($sortBy, ['created_at', 'updated_at', 'status', 'source', 'date_reclamation'])) {
+                $query->orderBy($sortBy, $direction);
+            }
+        } else {
+            $query->latest();
+        }
+        $recs = $query->paginate(25);
         return ReclamationResource::collection($recs);
     }
 

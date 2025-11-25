@@ -28,7 +28,15 @@ class ApprocheProprietaireController extends Controller
         if ($request->filled('proprietaire_id')) {
             $query->where('proprietaire_id', $request->get('proprietaire_id'));
         }
-        return JsonResource::collection($query->orderByDesc('id')->paginate($request->get('per_page', 15)));
+        if ($sortBy = $request->query('sort_by')) {
+            $direction = $request->query('order', 'asc');
+            if (in_array($sortBy, ['created_at', 'updated_at', 'description'])) {
+                $query->orderBy($sortBy, $direction);
+            }
+        } else {
+            $query->orderByDesc('id');
+        }
+        return JsonResource::collection($query->paginate($request->get('per_page', 15)));
     }
 
     public function store(Request $request)

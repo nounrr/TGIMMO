@@ -42,6 +42,14 @@ class BailResource extends JsonResource
                 'nb_sdb' => $this->unite?->nb_sdb,
                 'equipements' => $this->unite?->equipements ? explode(',', $this->unite->equipements) : [],
                 'statut' => $this->unite?->statut,
+                'proprietaires' => $this->unite?->proprietaires->map(function($prop) {
+                    return [
+                        'id' => $prop->id,
+                        'nom' => $prop->nom,
+                        'prenom' => $prop->prenom,
+                        'nom_complet' => $prop->nom . ' ' . $prop->prenom,
+                    ];
+                }),
             ],
 
             

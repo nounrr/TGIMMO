@@ -328,6 +328,10 @@ export const baseApi = createApi({
     }),
 
     // Interventions
+    getInterventionNatures: builder.query({
+      query: () => ({ url: 'interventions/natures' }),
+      providesTags: ['Intervention'],
+    }),
     getInterventions: builder.query({
       query: (params) => ({ 
         url: 'interventions', 
@@ -549,6 +553,7 @@ export const {
   useDeleteReclamationMutation, 
   useUploadReclamationJustifsMutation, 
   useDeleteReclamationJustifMutation, 
+  useGetInterventionNaturesQuery,
   useGetInterventionsQuery, 
   useGetInterventionQuery, 
   useCreateInterventionMutation, 

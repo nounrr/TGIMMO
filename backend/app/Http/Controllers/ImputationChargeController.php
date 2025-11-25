@@ -27,7 +27,15 @@ class ImputationChargeController extends Controller
             $query->where('id_impute',$request->id_impute);
         }
 
-        $charges = $query->latest()->paginate(15);
+        if ($sortBy = $request->query('sort_by')) {
+            $direction = $request->query('order', 'asc');
+            if (in_array($sortBy, ['created_at', 'updated_at', 'montant', 'titre', 'impute_a', 'payer_type'])) {
+                $query->orderBy($sortBy, $direction);
+            }
+        } else {
+            $query->latest();
+        }
+        $charges = $query->paginate(15);
         return response()->json($charges);
     }
 

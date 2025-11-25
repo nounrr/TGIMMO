@@ -66,6 +66,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('proprietaires', ProprietaireController::class);
 
         // Unités (CRUD)
+        Route::get('unites/immeubles', [UniteController::class, 'getImmeubles']);
         Route::apiResource('unites', UniteController::class);
 
     // Prestataires (CRUD)
@@ -106,6 +107,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('reclamations/{reclamation}/justifications/{justification}', [JustificationReclamationController::class, 'destroy']);
 
     // Interventions (CRUD)
+    Route::get('interventions/natures', [InterventionController::class, 'getNatures']);
     Route::apiResource('interventions', InterventionController::class);
     Route::get('interventions/{intervention}/docx', [InterventionController::class, 'downloadDocx'])->name('interventions.docx');
 

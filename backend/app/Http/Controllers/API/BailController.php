@@ -53,9 +53,20 @@ class BailController extends Controller
             $query->search($request->get('search'));
         }
 
+        // Tri
+        $sortBy = $request->query('sort_by');
+        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $allowedSorts = ['numero_bail', 'date_debut', 'date_fin', 'montant_loyer', 'statut', 'created_at'];
+        
+        if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $query->orderBy('date_debut', 'desc');
+        }
+
         $perPage = (int) $request->get('per_page', 20);
         if ($perPage <= 0) { $perPage = 20; }
-        $baux = $query->orderBy('date_debut', 'desc')->paginate($perPage);
+        $baux = $query->paginate($perPage);
 
         return BailResource::collection($baux);
     }
@@ -83,7 +94,14 @@ class BailController extends Controller
         ]);
 
         // Vérifier que l'unité est disponible (statut = vacant)
-        $unite = Unite::findOrFail($validated['unite_id']);
+        $unite = Unite::with('proprietaires')->findOrFail($validated['unite_id']);
+        
+        // Vérifier si l'unité a au moins un propriétaire
+        if ($unite->proprietaires->isEmpty()) {
+            return response()->json([
+                'message' => 'Impossible de créer un bail pour cette unité car elle n\'a aucun propriétaire assigné.'
+            ], 422);
+        }
         
         if ($unite->statut !== 'vacant') {
             return response()->json([
@@ -136,7 +154,7 @@ class BailController extends Controller
      */
     public function show(string $id)
     {
-        $bail = Bail::with(['locataire', 'unite'])->findOrFail($id);
+        $bail = Bail::with(['locataire', 'unite.proprietaires'])->findOrFail($id);
         
         return new BailResource($bail);
     }

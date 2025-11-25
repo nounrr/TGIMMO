@@ -38,11 +38,23 @@ class UniteController extends Controller
         if ($type = $request->query('type_unite')) {
             $q->where('type_unite', $type);
         }
+        if ($immeuble = $request->query('immeuble')) {
+            $q->where('immeuble', $immeuble);
+        }
         if ($statut = $request->query('statut')) {
             $q->where('statut', $statut);
         }
         if ($request->boolean('withLocataire')) {
             $q->with('locataireActuel');
+        }
+
+        if ($sortBy = $request->query('sort_by')) {
+            $direction = $request->query('order', 'asc');
+            if (in_array($sortBy, ['created_at', 'updated_at', 'numero_unite', 'immeuble', 'type_unite'])) {
+                $q->orderBy($sortBy, $direction);
+            }
+        } else {
+            $q->orderBy('created_at', 'desc');
         }
         
         // Statistiques globales (indépendantes des filtres)
@@ -128,6 +140,18 @@ class UniteController extends Controller
     {
         $unite->delete();
         return response()->json(null, 204);
+    }
+
+    public function getImmeubles()
+    {
+        $immeubles = Unite::select('immeuble')
+            ->whereNotNull('immeuble')
+            ->where('immeuble', '!=', '')
+            ->distinct()
+            ->orderBy('immeuble')
+            ->pluck('immeuble');
+            
+        return response()->json($immeubles);
     }
 
     private function validateData(Request $request, bool $creating, ?Unite $unite = null): array

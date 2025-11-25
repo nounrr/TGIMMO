@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wrench, Plus, Search, Filter, AlertTriangle, Info, Calendar, CheckCircle, XCircle, Clock, Lock } from 'lucide-react';
+import { Wrench, Plus, Search, Filter, AlertTriangle, Info, Calendar, CheckCircle, XCircle, Clock, Lock, ArrowUpDown } from 'lucide-react';
 
 export default function InterventionsShadcn() {
   const { can } = useAuthz();
@@ -18,13 +18,17 @@ export default function InterventionsShadcn() {
   const [status, setStatus] = useState('all');
   const [urgence, setUrgence] = useState('all');
   const [bailId, setBailId] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   const params = useMemo(() => ({
     q: q || undefined,
     status: status !== 'all' ? status : undefined,
     urgence: urgence !== 'all' ? urgence : undefined,
     bail_id: bailId !== 'all' ? bailId : undefined,
-  }), [q, status, urgence, bailId]);
+    sort_by: sortBy,
+    order: sortOrder,
+  }), [q, status, urgence, bailId, sortBy, sortOrder]);
 
   const { data, isLoading } = useGetInterventionsQuery(params);
   const items = data?.data || [];
@@ -54,18 +58,16 @@ export default function InterventionsShadcn() {
 
   const getStatusBadge = (st) => {
     const cfg = {
-      ouvert: { color: 'bg-red-100 text-red-700', icon: AlertTriangle, label: 'Ouvert' },
-      planifie: { color: 'bg-blue-100 text-blue-700', icon: Calendar, label: 'Planifié' },
-      en_cours: { color: 'bg-amber-100 text-amber-700', icon: Clock, label: 'En cours' },
-      resolu: { color: 'bg-green-100 text-green-700', icon: CheckCircle, label: 'Résolu' },
-      ferme: { color: 'bg-slate-100 text-slate-700', icon: Lock, label: 'Fermé' },
-      annule: { color: 'bg-slate-800 text-white', icon: XCircle, label: 'Annulé' },
+      ouvert: { color: 'bg-red-100 text-red-700', label: 'Ouvert' },
+      planifie: { color: 'bg-blue-100 text-blue-700', label: 'Planifié' },
+      en_cours: { color: 'bg-amber-100 text-amber-700', label: 'En cours' },
+      resolu: { color: 'bg-green-100 text-green-700', label: 'Résolu' },
+      ferme: { color: 'bg-slate-100 text-slate-700', label: 'Fermé' },
+      annule: { color: 'bg-slate-800 text-white', label: 'Annulé' },
     };
-    const c = cfg[st] || { color: 'bg-slate-100 text-slate-700', icon: Info, label: st };
-    const Icon = c.icon;
+    const c = cfg[st] || { color: 'bg-slate-100 text-slate-700', label: st };
     return (
-      <Badge variant="outline" className={`${c.color} border-0 flex items-center gap-1 w-fit`}>
-        <Icon className="h-3 w-3" />
+      <Badge variant="outline" className={`${c.color} border-0 w-fit`}>
         {c.label}
       </Badge>
     );
@@ -99,7 +101,7 @@ export default function InterventionsShadcn() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Recherche</Label>
               <div className="relative">
@@ -143,6 +145,31 @@ export default function InterventionsShadcn() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Trier par</Label>
+              <div className="flex gap-2">
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Trier par" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at">Date création</SelectItem>
+                    <SelectItem value="updated_at">Date modification</SelectItem>
+                    <SelectItem value="nature_probleme">Nature</SelectItem>
+                    <SelectItem value="status">Statut</SelectItem>
+                    <SelectItem value="urgence">Urgence</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  title={sortOrder === 'asc' ? "Croissant" : "Décroissant"}
+                >
+                  <ArrowUpDown className={`h-4 w-4 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -157,7 +184,7 @@ export default function InterventionsShadcn() {
                 <TableHead>Lieu / Bail</TableHead>
                 <TableHead>Urgence</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Date prévue</TableHead>
+                <TableHead className="text-right">Date planifiée</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -178,12 +205,12 @@ export default function InterventionsShadcn() {
                 items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">#{item.id}</TableCell>
-                    <TableCell className="font-medium">{item.titre}</TableCell>
+                    <TableCell className="font-medium">{item.nature_probleme}</TableCell>
                     <TableCell>
                       {item.bail ? (
                         <div className="flex flex-col">
                           <span className="font-medium text-sm">
-                            {item.bail.bien?.nom || `Bien #${item.bail.bien_id}`}
+                            {item.bail.unite?.numero_unite || item.bail.unite?.reference || `Unité #${item.bail.unite_id}`}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             Bail #{item.bail.id}
@@ -192,9 +219,9 @@ export default function InterventionsShadcn() {
                       ) : '-'}
                     </TableCell>
                     <TableCell>{getUrgenceBadge(item.urgence)}</TableCell>
-                    <TableCell>{getStatusBadge(item.statut)}</TableCell>
+                    <TableCell>{getStatusBadge(item.status)}</TableCell>
                     <TableCell className="text-right text-muted-foreground text-sm">
-                      {item.date_prevue ? new Date(item.date_prevue).toLocaleDateString() : '-'}
+                      {item.date_planifiee ? new Date(item.date_planifiee).toLocaleDateString() : '-'}
                     </TableCell>
                     <TableCell className="text-center">
                       <Link to={`/interventions/${item.id}/edit`}>

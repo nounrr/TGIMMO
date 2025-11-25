@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useGetMandatQuery, useUpdateMandatMutation } from '../api/baseApi';
+import { useGetMandatQuery, useUpdateMandatMutation, useCreateMandatMutation } from '../api/baseApi';
+import { useGetProprietairesQuery } from '../features/proprietaires/proprietairesApi';
 import { PERMS } from '../utils/permissionKeys';
 import useAuthz from '../hooks/useAuthz';
 import { Button } from "@/components/ui/button";
@@ -22,15 +23,45 @@ const formatDateForInput = (dateString) => {
 
 export default function MandatEditShadcn() {
   const { id } = useParams();
+  const isNew = id === 'nouveau';
   const navigate = useNavigate();
   const location = useLocation();
   const { can } = useAuthz();
   const mandatState = location.state?.mandat;
-  const { data, isFetching } = useGetMandatQuery(id, { skip: !!mandatState });
-  const [updateMandat, { isLoading }] = useUpdateMandatMutation();
+  const { data, isFetching } = useGetMandatQuery(id, { skip: isNew || !!mandatState });
+  const { data: proprietairesData } = useGetProprietairesQuery({ per_page: 1000 });
+  const proprietaires = proprietairesData?.data || [];
+  const [updateMandat, { isLoading: isUpdating }] = useUpdateMandatMutation();
+  const [createMandat, { isLoading: isCreating }] = useCreateMandatMutation();
   const [form, setForm] = useState(null);
 
   useEffect(() => {
+    if (isNew && !form) {
+      setForm({
+        proprietaire_id: '',
+        reference: '',
+        date_debut: '',
+        date_fin: '',
+        taux_gestion_pct: '',
+        assiette_honoraires: 'loyers_encaisse',
+        tva_applicable: false,
+        tva_taux: '',
+        frais_min_mensuel: '',
+        periodicite_releve: 'mensuel',
+        charge_maintenance: 'proprietaire',
+        mode_versement: 'virement',
+        description_bien: '',
+        usage_bien: 'habitation',
+        pouvoirs_accordes: '',
+        lieu_signature: '',
+        date_signature: '',
+        langue: 'fr',
+        notes_clauses: '',
+        statut: 'brouillon',
+      });
+      return;
+    }
+
     const source = mandatState || data;
     if (source && !form) {
       setForm({
@@ -56,9 +87,9 @@ export default function MandatEditShadcn() {
         statut: source.statut || 'brouillon',
       });
     }
-  }, [data, mandatState, form]);
+  }, [data, mandatState, form, isNew]);
 
-  if ((isFetching && !mandatState) || !form) {
+  if ((isFetching && !isNew && !mandatState) || !form) {
     return (
       <div className="flex items-center justify-center h-screen">
         <RefreshCw className="h-8 w-8 animate-spin text-primary" />
@@ -77,11 +108,16 @@ export default function MandatEditShadcn() {
         tva_taux: form.tva_taux === '' ? null : Number(form.tva_taux),
         frais_min_mensuel: form.frais_min_mensuel === '' ? null : Number(form.frais_min_mensuel),
       };
-      await updateMandat({ id, payload }).unwrap();
+      
+      if (isNew) {
+        await createMandat(payload).unwrap();
+      } else {
+        await updateMandat({ id, payload }).unwrap();
+      }
       navigate('/mandats');
     } catch (err) {
       console.error(err);
-      alert('Erreur de mise à jour du mandat');
+      alert(isNew ? 'Erreur de création du mandat' : 'Erreur de mise à jour du mandat');
     }
   };
 
@@ -119,18 +155,20 @@ export default function MandatEditShadcn() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
               <FileText className="h-8 w-8 text-blue-600" />
-              Modifier le mandat (SHADCN)
+              {isNew ? 'Nouveau mandat' : 'Modifier le mandat'}
             </h1>
             <p className="text-slate-500">Référence: {form.reference || 'N/A'}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleDownloadDocx} className="gap-2">
-            <Download className="h-4 w-4" />
-            Générer DOCX
-          </Button>
-          <Button onClick={onSave} disabled={isLoading} className="gap-2 bg-blue-600 hover:bg-blue-700">
-            {isLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {!isNew && (
+            <Button variant="outline" onClick={handleDownloadDocx} className="gap-2">
+              <Download className="h-4 w-4" />
+              Générer DOCX
+            </Button>
+          )}
+          <Button onClick={onSave} disabled={isCreating || isUpdating} className="gap-2 bg-blue-600 hover:bg-blue-700">
+            {(isCreating || isUpdating) ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Enregistrer
           </Button>
         </div>
@@ -145,6 +183,25 @@ export default function MandatEditShadcn() {
                 <CardTitle className="text-lg">Informations Générales</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Propriétaire</Label>
+                  <Select 
+                    value={form.proprietaire_id ? String(form.proprietaire_id) : ''} 
+                    onValueChange={v => onChange('proprietaire_id', v)}
+                    disabled={!isNew} // Usually we don't change owner of a mandate
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un propriétaire" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {proprietaires.map(p => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.nom_raison || p.email || `#${p.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label>Référence</Label>
                   <Input 

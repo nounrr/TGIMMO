@@ -12,9 +12,12 @@ class InterventionResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'bail' => $this->bail ? [ 'id' => $this->bail->id, 'numero_bail' => $this->bail->numero_bail ] : null,
-            'locataire' => $this->locataire ? [ 'id' => $this->locataire->id, 'nom' => $this->locataire->nom, 'prenom' => $this->locataire->prenom ] : null,
-            'proprietaire' => $this->proprietaire ? [ 'id' => $this->proprietaire->id, 'nom' => $this->proprietaire->nom ] : null,
+            'bail' => $this->bail ? [ 
+                'id' => $this->bail->id, 
+                'numero_bail' => $this->bail->numero_bail,
+                'unite' => $this->bail->unite, // Changed from bien to unite
+                'locataire' => $this->bail->locataire 
+            ] : null,
             'prestataire' => $this->prestataire ? [ 'id' => $this->prestataire->id, 'nom' => $this->prestataire->nom ] : null,
             'reclamation' => $this->reclamation ? [ 'id' => $this->reclamation->id ] : null,
 

@@ -53,6 +53,16 @@ class AvenantMandatController extends Controller
             $query->whereDate('date_effet', '<=', $to);
         }
 
+        if ($sortBy = $request->query('sort_by')) {
+            $direction = $request->query('order', 'asc');
+            // Security check to prevent SQL injection via column names
+            if (in_array($sortBy, ['created_at', 'updated_at', 'reference', 'objet_resume', 'date_effet'])) {
+                $query->orderBy($sortBy, $direction);
+            }
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
         $perPage = (int) $request->query('per_page', 15);
         $result = $query->paginate($perPage);
         return response()->json($result);

@@ -3,18 +3,30 @@ import { baseApi } from '../../api/baseApi';
 export const unitesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getUnites: builder.query({
-      query: ({ page = 1, per_page = 10, search = '', type_unite = '', statut = '' } = {}) => {
-        const params = new URLSearchParams();
-        params.append('page', page.toString());
-        params.append('per_page', per_page.toString());
-        if (search) params.append('q', search);
-        if (type_unite) params.append('type_unite', type_unite);
-        if (statut) params.append('statut', statut);
-        params.append('withLocataire', 'true');
+      query: (params = {}) => {
+        const searchParams = new URLSearchParams();
+        // Defaults
+        if (!params.page) searchParams.append('page', '1');
+        if (!params.per_page) searchParams.append('per_page', '10');
+        searchParams.append('withLocataire', 'true');
+
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            // Map 'search' to 'q' if needed, or just pass through
+            if (key === 'search') {
+               searchParams.append('q', value);
+            } else {
+               searchParams.append(key, value);
+            }
+          }
+        });
         
-        return `/unites?${params.toString()}`;
+        return `/unites?${searchParams.toString()}`;
       },
       providesTags: ['Unite'],
+    }),
+    getImmeubles: builder.query({
+      query: () => '/unites/immeubles',
     }),
     getUnite: builder.query({
       query: (id) => `/unites/${id}?withLocataire=true`,
@@ -49,6 +61,7 @@ export const unitesApi = baseApi.injectEndpoints({
 
 export const {
   useGetUnitesQuery,
+  useGetImmeublesQuery,
   useGetUniteQuery,
   useCreateUniteMutation,
   useUpdateUniteMutation,

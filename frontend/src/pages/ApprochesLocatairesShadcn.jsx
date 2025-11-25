@@ -16,11 +16,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Plus, User, Trash2, Filter, RefreshCw, FileText, Pencil } from 'lucide-react';
+import { MessageSquare, Plus, User, Trash2, Filter, RefreshCw, FileText, Pencil, ArrowUpDown } from 'lucide-react';
 
 export default function ApprochesLocatairesShadcn() {
   const [filters, setFilters] = useState({ locataire_id: '' });
-  const { data, isLoading } = useGetApprocheLocatairesQuery(filters);
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  const queryParams = useMemo(() => ({
+    ...filters,
+    sort_by: sortBy,
+    order: sortOrder,
+  }), [filters, sortBy, sortOrder]);
+
+  const { data, isLoading } = useGetApprocheLocatairesQuery(queryParams);
   const [createApproche, { isLoading: saving }] = useCreateApprocheLocataireMutation();
   const [updateApproche, { isLoading: updating }] = useUpdateApprocheLocataireMutation();
   const [deleteApproche, { isLoading: isDeleting }] = useDeleteApprocheLocataireMutation();
@@ -298,6 +307,28 @@ export default function ApprochesLocatairesShadcn() {
                 noOptionsMessage={() => "Aucun locataire trouvé"}
                 loadingMessage={() => "Chargement..."}
               />
+            </div>
+            <div className="flex-1 space-y-2">
+              <Label>Trier par</Label>
+              <div className="flex gap-2">
+                <select 
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="created_at">Date création</option>
+                  <option value="updated_at">Date modification</option>
+                  <option value="description">Description</option>
+                </select>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  title={sortOrder === 'asc' ? "Croissant" : "Décroissant"}
+                >
+                  <ArrowUpDown className={`h-4 w-4 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                </Button>
+              </div>
             </div>
             <div className="flex items-end">
               <Button 

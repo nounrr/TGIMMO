@@ -97,6 +97,7 @@ export default function BailEdit() {
             <div className="space-y-1"><div className="text-slate-500">Numéro de bail</div><div className="font-medium">{bail.numero_bail || `#${bail.id}`}</div></div>
             <div className="space-y-1"><div className="text-slate-500">Locataire</div><div className="font-medium">{bail.locataire?.prenom} {bail.locataire?.nom}</div></div>
             <div className="space-y-1"><div className="text-slate-500">Unité</div><div className="font-medium">{bail.unite?.numero_unite || bail.unite?.reference || `#${bail.unite_id}`}</div></div>
+            <div className="space-y-1"><div className="text-slate-500">Propriétaire</div><div className="font-medium">{bail.unite?.proprietaires?.map(p => p.nom_complet).join(', ') || '—'}</div></div>
             <div className="space-y-1"><div className="text-slate-500">Loyer total</div><div className="font-medium text-emerald-700">{bail.loyer_total} MAD</div></div>
           </div>
         </CardContent>

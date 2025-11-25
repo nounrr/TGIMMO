@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Loader2, ArrowUpDown } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import useAuthz from '@/hooks/useAuthz';
 import ChargeForm from './ChargeForm';
@@ -27,7 +27,15 @@ export default function ChargesList() {
   const canUpdate = can('charges.update');
   const canDelete = can('charges.delete');
 
-  const { data, isLoading, isFetching } = useGetImputationChargesQuery({});
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  const queryParams = useMemo(() => ({
+    sort_by: sortBy,
+    order: sortOrder,
+  }), [sortBy, sortOrder]);
+
+  const { data, isLoading, isFetching } = useGetImputationChargesQuery(queryParams);
   const [deleteCharge] = useDeleteImputationChargeMutation();
   const { toast } = useToast();
   
@@ -134,13 +142,36 @@ export default function ChargesList() {
         )}
       </div>
 
-      <div className="flex items-center gap-2 max-w-sm">
-        <Search className="h-4 w-4 text-slate-500" />
-        <Input 
-          placeholder="Rechercher..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex items-center gap-2 max-w-sm flex-1">
+          <Search className="h-4 w-4 text-slate-500" />
+          <Input 
+            placeholder="Rechercher..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Trier par" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at">Date création</SelectItem>
+              <SelectItem value="updated_at">Date modification</SelectItem>
+              <SelectItem value="montant">Montant</SelectItem>
+              <SelectItem value="titre">Titre</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            title={sortOrder === 'asc' ? "Croissant" : "Décroissant"}
+          >
+            <ArrowUpDown className={`h-4 w-4 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       <div className="border rounded-lg bg-white shadow-sm">

@@ -29,23 +29,25 @@ class UserSeeder extends Seeder
         }
 
         // Créer beaucoup d'employés (ex: 20)
-        for ($i = 1; $i <= 20; $i++) {
-            $email = "employe{$i}@example.com";
-            $user = User::firstOrCreate(
-                ['email' => $email],
-                [
-                    'name' => "Employe {$i}",
-                    'fonction' => 'Employé',
-                    'service' => 'Opérations',
-                    'telephone_interne' => (string)(1000 + $i),
-                    'statut' => 'actif',
-                    'password' => Hash::make('ChangeMe123!'),
-                ]
-            );
 
-            if (!$user->hasRole('employe')) {
-                $user->assignRole('employe');
-            }
-        }
+
+        // for ($i = 1; $i <= 20; $i++) {
+        //     $email = "employe{$i}@example.com";
+        //     $user = User::firstOrCreate(
+        //         ['email' => $email],
+        //         [
+        //             'name' => "Employe {$i}",
+        //             'fonction' => 'Employé',
+        //             'service' => 'Opérations',
+        //             'telephone_interne' => (string)(1000 + $i),
+        //             'statut' => 'actif',
+        //             'password' => Hash::make('ChangeMe123!'),
+        //         ]
+        //     );
+
+        //     if (!$user->hasRole('employe')) {
+        //         $user->assignRole('employe');
+        //     }
+        // }
     }
 }

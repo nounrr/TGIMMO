@@ -15,8 +15,6 @@ class UpdateInterventionRequest extends FormRequest
     {
         return [
             'bail_id' => ['sometimes','nullable','exists:baux,id'],
-            'locataire_id' => ['sometimes','nullable','exists:locataires,id'],
-            'proprietaire_id' => ['sometimes','nullable','exists:proprietaires,id'],
             'prestataire_id' => ['sometimes','nullable','exists:prestataires,id'],
             'reclamation_id' => ['sometimes','nullable','exists:reclamations,id'],
 

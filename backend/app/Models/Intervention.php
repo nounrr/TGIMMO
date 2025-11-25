@@ -10,7 +10,7 @@ class Intervention extends Model
     use HasFactory;
 
     protected $fillable = [
-        'bail_id', 'locataire_id', 'proprietaire_id', 'prestataire_id', 'reclamation_id',
+        'bail_id', 'prestataire_id', 'reclamation_id',
         'demandeur_nom_societe', 'demandeur_service', 'demandeur_telephone', 'demandeur_email',
         'date_demande', 'urgence',
         'nature_probleme', 'localisation', 'symptomes', 'pieces_materiel',
@@ -24,8 +24,6 @@ class Intervention extends Model
     ];
 
     public function bail() { return $this->belongsTo(Bail::class); }
-    public function locataire() { return $this->belongsTo(Locataire::class); }
-    public function proprietaire() { return $this->belongsTo(Proprietaire::class); }
     public function prestataire() { return $this->belongsTo(Prestataire::class); }
     public function reclamation() { return $this->belongsTo(Reclamation::class); }
 }

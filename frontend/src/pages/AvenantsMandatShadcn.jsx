@@ -8,15 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import Select from 'react-select';
-import { FileText, Plus, Search, Filter, RefreshCw, Edit, FileSignature } from 'lucide-react';
+import { FileText, Plus, Search, Filter, RefreshCw, Edit, FileSignature, ArrowUpDown } from 'lucide-react';
 
 export default function AvenantsMandatShadcn() {
   const [q, setQ] = useState('');
   const [mandatId, setMandatId] = useState('all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
   
   const queryParams = {};
   if (q) queryParams.q = q;
   if (mandatId && mandatId !== 'all') queryParams.mandat_id = mandatId;
+  queryParams.sort_by = sortBy;
+  queryParams.order = sortOrder;
   
   const { data, isFetching, refetch } = useGetAvenantsQuery(Object.keys(queryParams).length > 0 ? queryParams : undefined);
   const { data: mandatsData } = useGetMandatsQuery({ per_page: 1000 });
@@ -91,7 +95,7 @@ export default function AvenantsMandatShadcn() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Recherche</Label>
               <div className="relative">
@@ -118,13 +122,36 @@ export default function AvenantsMandatShadcn() {
                 loadingMessage={() => 'Chargement...'}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Trier par</Label>
+              <div className="flex gap-2">
+                <select 
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="created_at">Date création</option>
+                  <option value="updated_at">Date modification</option>
+                  <option value="reference">Référence</option>
+                  <option value="objet_resume">Objet</option>
+                </select>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  title={sortOrder === 'asc' ? "Croissant" : "Décroissant"}
+                >
+                  <ArrowUpDown className={`h-4 w-4 ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                </Button>
+              </div>
+            </div>
             <div className="flex items-end">
               <Button 
                 variant="outline" 
-                onClick={() => { setQ(''); setMandatId('all'); refetch(); }}
+                onClick={() => { setQ(''); setMandatId('all'); setSortBy('created_at'); setSortOrder('desc'); refetch(); }}
                 className="w-full md:w-auto"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Réinitialiser
               </Button>
             </div>

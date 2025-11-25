@@ -268,6 +268,20 @@ export default function LocatairesShadcn() {
     return `${locataire.nom} ${locataire.prenom}`;
   };
 
+  const getStatutBadge = (statut) => {
+    const variants = {
+      actif: 'bg-green-100 text-green-700 hover:bg-green-100',
+      inactif: 'bg-red-100 text-red-700 hover:bg-red-100',
+      brouillon: 'bg-slate-100 text-slate-700 hover:bg-slate-100',
+    };
+    const labels = {
+      actif: 'Actif',
+      inactif: 'Inactif',
+      brouillon: 'Brouillon',
+    };
+    return <Badge className={variants[statut] || ''}>{labels[statut] || statut}</Badge>;
+  };
+
   if (!can(PERMS.locataires.view)) {
     return (
       <div className="p-6">
@@ -316,6 +330,26 @@ export default function LocatairesShadcn() {
                 <SelectItem value="societe">Société</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_at">Date création</SelectItem>
+                <SelectItem value="updated_at">Date modification</SelectItem>
+                <SelectItem value="nom">Nom</SelectItem>
+                <SelectItem value="raison_sociale">Raison Sociale</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+              title={sortDir === 'asc' ? "Croissant" : "Décroissant"}
+            >
+              <ArrowUpDown className={`h-4 w-4 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+            </Button>
           </div>
 
           <div className="rounded-md border">
@@ -358,9 +392,7 @@ export default function LocatairesShadcn() {
                         {getTypeBadge(locataire.type_personne)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={locataire.statut === 'actif' ? 'success' : 'secondary'}>
-                          {locataire.statut}
-                        </Badge>
+                        {getStatutBadge(locataire.statut)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col text-sm">
