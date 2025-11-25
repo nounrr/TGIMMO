@@ -432,20 +432,28 @@ export default function Sidebar() {
                  style={{
                    width: '48px',
                    height: '48px',
-                   background: 'linear-gradient(135deg, #2563eb, #7c3aed)'
+                   backgroundColor: '#001f3f',
+                   background: '#001f3f'
                  }}>
-              <svg className="text-white" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
+              <img src="/logo.png" alt="TGI" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             </div>
             <div>
               <h1 className="h5 fw-bold mb-0" style={{
-                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
+                color: '#001f3f'
               }}>TGI</h1>
               <p className="small text-muted mb-0">Gestion Immobilière</p>
             </div>
+          </div>
+        )}
+        {isCollapsed && (
+           <div className="rounded-3 shadow-sm d-flex align-items-center justify-content-center mx-auto mb-3"
+           style={{
+             width: '48px',
+             height: '48px',
+             backgroundColor: '#001f3f',
+             background: '#001f3f'
+           }}>
+            <img src="/logo.png" alt="TGI" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
           </div>
         )}
         <button

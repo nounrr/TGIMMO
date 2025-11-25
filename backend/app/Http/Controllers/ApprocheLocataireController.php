@@ -54,7 +54,17 @@ class ApprocheLocataireController extends Controller
             'locataire_id' => 'required|exists:locataires,id',
             'description' => 'nullable|string',
             'statut' => 'nullable|string',
+            'audio' => 'nullable|file|mimes:audio/mpeg,mpga,mp3,wav,aac,webm',
         ]);
+
+        if ($request->hasFile('audio')) {
+            if (!$request->user()->can('approches.audio')) {
+                return response()->json(['message' => 'Vous n\'avez pas la permission d\'ajouter un audio.'], 403);
+            }
+            $path = $request->file('audio')->store('audio/approches', 'public');
+            $data['audio_path'] = $path;
+        }
+        unset($data['audio']);
 
         $approche = ApprocheLocataire::create($data);
         return response()->json($approche, 201);
@@ -73,7 +83,18 @@ class ApprocheLocataireController extends Controller
             'locataire_id' => 'sometimes|exists:locataires,id',
             'description' => 'nullable|string',
             'statut' => 'nullable|string',
+            'audio' => 'nullable|file|mimes:audio/mpeg,mpga,mp3,wav,aac,webm',
         ]);
+
+        if ($request->hasFile('audio')) {
+            if (!$request->user()->can('approches.audio')) {
+                return response()->json(['message' => 'Vous n\'avez pas la permission d\'ajouter un audio.'], 403);
+            }
+            $path = $request->file('audio')->store('audio/approches', 'public');
+            $data['audio_path'] = $path;
+        }
+        unset($data['audio']);
+
         $approche->update($data);
         return response()->json($approche);
     }

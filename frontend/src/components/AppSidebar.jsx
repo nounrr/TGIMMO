@@ -95,12 +95,6 @@ export default function AppSidebar() {
       icon: LayoutDashboard,
     },
     {
-      title: 'Liquidations',
-      url: '/liquidations',
-      icon: FileText,
-      permission: PERMS.liquidations.view,
-    },
-    {
       title: 'Gestion Locative',
       icon: Home,
       items: [
@@ -108,10 +102,11 @@ export default function AppSidebar() {
         { title: 'Avenants', url: '/avenants', icon: FilePlus, permission: PERMS.avenants.view },
         { title: 'Baux', url: '/baux', icon: Briefcase, permission: PERMS.baux.view },
         { title: 'Remises clés', url: '/remises-cles', icon: Key, permission: PERMS.remises_cles.view },
+        { title: 'Liquidations', url: '/liquidations', icon: FileText, permission: PERMS.liquidations.view },
       ],
     },
     {
-      title: 'Approches',
+      title: 'Prospection',
       icon: UserCheck,
       items: [
         { title: 'Propriétaires', url: '/approches/proprietaires', icon: UserCog, permission: PERMS.approches_proprietaires.view },
@@ -176,12 +171,12 @@ export default function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Building2 className="h-5 w-5" />
+        <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#001f3f] text-white shrink-0">
+            <img src="/logo.png" alt="TGI" className="h-6 w-6 object-contain" />
           </div>
-          <div>
-            <h2 className="text-lg font-semibold">TGI</h2>
+          <div className="group-data-[collapsible=icon]:hidden">
+            <h2 className="text-lg font-semibold text-[#001f3f]">TGI</h2>
             <p className="text-xs text-muted-foreground">Gestion Immobilière</p>
           </div>
         </div>

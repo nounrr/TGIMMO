@@ -54,7 +54,18 @@ class ApprocheProprietaireController extends Controller
         $data = $request->validate([
             'proprietaire_id' => 'required|exists:proprietaires,id',
             'description' => 'nullable|string',
+            'audio' => 'nullable|file|mimes:audio/mpeg,mpga,mp3,wav,aac,webm',
         ]);
+
+        if ($request->hasFile('audio')) {
+            if (!$request->user()->can('approches.audio')) {
+                return response()->json(['message' => 'Vous n\'avez pas la permission d\'ajouter un audio.'], 403);
+            }
+            $path = $request->file('audio')->store('audio/approches', 'public');
+            $data['audio_path'] = $path;
+        }
+        unset($data['audio']);
+
         $item = ApprocheProprietaire::create($data);
         return new JsonResource($item->load('proprietaire'));
     }
@@ -77,7 +88,18 @@ class ApprocheProprietaireController extends Controller
         $data = $request->validate([
             'proprietaire_id' => 'sometimes|exists:proprietaires,id',
             'description' => 'nullable|string',
+            'audio' => 'nullable|file|mimes:audio/mpeg,mpga,mp3,wav,aac,webm',
         ]);
+
+        if ($request->hasFile('audio')) {
+            if (!$request->user()->can('approches.audio')) {
+                return response()->json(['message' => 'Vous n\'avez pas la permission d\'ajouter un audio.'], 403);
+            }
+            $path = $request->file('audio')->store('audio/approches', 'public');
+            $data['audio_path'] = $path;
+        }
+        unset($data['audio']);
+
         $approcheProprietaire->update($data);
         return new JsonResource($approcheProprietaire->load('proprietaire'));
     }

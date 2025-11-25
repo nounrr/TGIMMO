@@ -56,6 +56,8 @@ class CompleteApplicationSeeder extends Seeder
             ChargePermissionSeeder::class,
             PaiementPermissionSeeder::class,
             UniteOwnershipPermissionSeeder::class,
+            LiquidationPermissionSeeder::class,
+            StatusPermissionSeeder::class,
         ]);
 
         $this->command->info('Creation des utilisateurs...');

@@ -433,7 +433,12 @@ export const baseApi = createApi({
       invalidatesTags: ['ApprocheProprietaire'],
     }),
     updateApprocheProprietaire: builder.mutation({
-      query: ({ id, ...patch }) => ({ url: `approche-proprietaires/${id}`, method: 'PUT', body: patch }),
+      query: ({ id, ...patch }) => {
+        if (patch.data instanceof FormData) {
+          return { url: `approche-proprietaires/${id}`, method: 'POST', body: patch.data };
+        }
+        return { url: `approche-proprietaires/${id}`, method: 'PUT', body: patch };
+      },
       invalidatesTags: (_res,_err,arg) => [{ type: 'ApprocheProprietaire', id: arg.id }],
     }),
     deleteApprocheProprietaire: builder.mutation({
@@ -455,7 +460,12 @@ export const baseApi = createApi({
       invalidatesTags: ['ApprocheLocataire'],
     }),
     updateApprocheLocataire: builder.mutation({
-      query: ({ id, ...patch }) => ({ url: `approche-locataires/${id}`, method: 'PUT', body: patch }),
+      query: ({ id, ...patch }) => {
+        if (patch.data instanceof FormData) {
+          return { url: `approche-locataires/${id}`, method: 'POST', body: patch.data };
+        }
+        return { url: `approche-locataires/${id}`, method: 'PUT', body: patch };
+      },
       invalidatesTags: (_res,_err,arg) => [{ type: 'ApprocheLocataire', id: arg.id }],
     }),
     deleteApprocheLocataire: builder.mutation({

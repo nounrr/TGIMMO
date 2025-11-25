@@ -1,4 +1,7 @@
 export const PERMS = {
+  approches: {
+    audio: 'approches.audio',
+  },
   approches_proprietaires: {
     view: 'approches-proprietaires.view',
     create: 'approches-proprietaires.create',

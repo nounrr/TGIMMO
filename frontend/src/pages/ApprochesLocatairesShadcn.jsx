@@ -17,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Plus, User, Trash2, Filter, RefreshCw, FileText, Pencil, ArrowUpDown } from 'lucide-react';
+import { AudioRecorder } from '../components/AudioRecorder';
+import { MiniAudioPlayer } from '../components/MiniAudioPlayer';
 
 export default function ApprochesLocatairesShadcn() {
   const [filters, setFilters] = useState({ locataire_id: '' });
@@ -37,6 +39,9 @@ export default function ApprochesLocatairesShadcn() {
   const [description, setDescription] = useState('');
   const [selectedLocataire, setSelectedLocataire] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [existingAudioUrl, setExistingAudioUrl] = useState(null);
+  const [formKey, setFormKey] = useState(0);
   
   const [filterLocataire, setFilterLocataire] = useState(null);
   const { can, permissions, user } = useAuthz();
@@ -79,25 +84,42 @@ export default function ApprochesLocatairesShadcn() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!description.trim() || !selectedLocataire) return;
     
+    // Validation: Description is required ONLY if no audio is present
+    const hasAudio = !!audioBlob || !!existingAudioUrl;
+    if (!hasAudio && !description.trim()) {
+        alert("Veuillez saisir une description ou enregistrer un audio.");
+        return;
+    }
+    if (!selectedLocataire) {
+        alert("Veuillez sélectionner un locataire.");
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('locataire_id', selectedLocataire.value);
+    formData.append('description', description || ''); // Allow empty string if audio exists
+    if (audioBlob) {
+        formData.append('audio', audioBlob, 'recording.webm');
+    }
+
     try {
       if (editingId) {
+        formData.append('_method', 'PUT');
         await updateApproche({ 
           id: editingId, 
-          locataire_id: selectedLocataire.value, 
-          description 
+          data: formData 
         }).unwrap();
         setEditingId(null);
       } else {
-        await createApproche({ 
-          locataire_id: selectedLocataire.value, 
-          description 
-        }).unwrap();
+        await createApproche(formData).unwrap();
       }
       
       setDescription('');
       setSelectedLocataire(null);
+      setAudioBlob(null);
+      setExistingAudioUrl(null);
+      setFormKey(k => k + 1);
     } catch (error) {
       console.error("Erreur lors de l'enregistrement:", error);
     }
@@ -106,6 +128,9 @@ export default function ApprochesLocatairesShadcn() {
   const handleEdit = (approche) => {
     setEditingId(approche.id);
     setDescription(approche.description || '');
+    setExistingAudioUrl(approche.audio_url || null);
+    setAudioBlob(null);
+    setFormKey(k => k + 1);
     
     // Trouver l'option correspondante pour le select
     const locOption = locataireOptions.find(opt => opt.value === approche.locataire_id);
@@ -121,6 +146,9 @@ export default function ApprochesLocatairesShadcn() {
     setEditingId(null);
     setDescription('');
     setSelectedLocataire(null);
+    setAudioBlob(null);
+    setExistingAudioUrl(null);
+    setFormKey(k => k + 1);
   };
   
   // Styles personnalisés pour react-select pour matcher shadcn
@@ -223,21 +251,36 @@ export default function ApprochesLocatairesShadcn() {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-info" />
-                    Description de l'approche <span className="text-red-500">*</span>
+                    Description de l'approche {(audioBlob || existingAudioUrl) ? '' : <span className="text-red-500">*</span>}
                   </Label>
                   <Textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Décrivez l'approche commerciale effectuée..."
+                    placeholder={(audioBlob || existingAudioUrl) ? "Description (optionnelle avec audio)..." : "Décrivez l'approche commerciale effectuée..."}
                     rows={4}
                   />
+                  
+                  <div className="pt-2">
+                    <Label className="mb-2 block">Enregistrement Audio (Optionnel)</Label>
+                    <AudioRecorder 
+                        key={formKey}
+                        onAudioRecorded={setAudioBlob} 
+                        existingAudioUrl={existingAudioUrl}
+                        disabled={!can(PERMS.approches.audio)}
+                    />
+                    {!can(PERMS.approches.audio) && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Vous n'avez pas la permission d'ajouter des enregistrements audio.
+                        </p>
+                    )}
+                  </div>
                 </div>
               </div>
               
               <div className="flex gap-2 pt-2">
                 <Button
                   type="submit"
-                  disabled={saving || updating || !selectedLocataire || !description.trim()}
+                  disabled={saving || updating || !selectedLocataire || (!description.trim() && !audioBlob && !existingAudioUrl)}
                   className="gap-2"
                 >
                   {saving || updating ? (
@@ -367,7 +410,7 @@ export default function ApprochesLocatairesShadcn() {
                   <TableRow className="bg-slate-50 hover:bg-slate-50">
                     <TableHead className="w-[80px]">ID</TableHead>
                     <TableHead>Locataire</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead className="min-w-[350px]">Description</TableHead>
                     <TableHead className="text-center w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -384,7 +427,19 @@ export default function ApprochesLocatairesShadcn() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {approche.description || <span className="text-muted-foreground italic">Aucune description</span>}
+                        <div className="flex flex-col gap-2">
+                            {approche.description && (
+                                <p className="text-sm">{approche.description}</p>
+                            )}
+                            {approche.audio_url && (
+                                <div className="mt-1">
+                                    <MiniAudioPlayer src={approche.audio_url} />
+                                </div>
+                            )}
+                            {!approche.description && !approche.audio_url && (
+                                <span className="text-muted-foreground italic">Aucun contenu</span>
+                            )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2">

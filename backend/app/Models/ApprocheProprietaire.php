@@ -15,7 +15,15 @@ class ApprocheProprietaire extends Model
         'proprietaire_id',
         'description',
         'statut',
+        'audio_path',
     ];
+
+    protected $appends = ['audio_url'];
+
+    public function getAudioUrlAttribute()
+    {
+        return $this->audio_path ? asset('storage/' . $this->audio_path) : null;
+    }
 
     public function proprietaire()
     {
