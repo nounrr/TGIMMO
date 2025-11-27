@@ -35,6 +35,8 @@ import ApprochesLocatairesShadcn from './pages/ApprochesLocatairesShadcn';
 import ChargesList from './pages/ChargesList';
 import LiquidationList from './pages/LiquidationList';
 import TestDebug from './pages/TestDebug';
+import GuideShadcn from './pages/GuideShadcn';
+import TestUniteMandat from './pages/TestUniteMandat';
 
 
 export default function App() {
@@ -82,8 +84,10 @@ export default function App() {
             <Route path="/liquidations" element={<LiquidationList />} />
             <Route path="/test-debug" element={<TestDebug />} />
             <Route path="/test-debug-top" element={<TestDebug />} />
+            <Route path="/test-unite-mandat" element={<TestUniteMandat />} />
             <Route path="/roles-permissions" element={<RolesPermissionsShadcn />} />
             <Route path="/employes" element={<EmployesShadcn />} />
+            <Route path="/guide" element={<GuideShadcn />} />
             <Route path="*" element={<Dashboard />} />
           </Route>
         </Route>

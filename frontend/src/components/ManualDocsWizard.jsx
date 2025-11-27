@@ -1,6 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useState } from 'react';
 import { useCreateMandatMutation, useCreateAvenantMutation, useGetMeQuery } from '../api/baseApi';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 /**
  * ManualDocsWizard
@@ -14,14 +21,16 @@ import { useCreateMandatMutation, useCreateAvenantMutation, useGetMeQuery } from
  *  - uniteDescription: string (optional prefilled description)
  *  - allowAvenant: boolean (if user wants to optionally create avenant right after mandat)
  *  - lockCoreFields: boolean (if true, proprietaire and dates are prefilled and disabled)
+ *  - defaultMandatId: number | undefined (prefill mandat_id for avenant)
+ *  - unitOwners: array of { id, nom, parts } (optional, to display multiple owners)
  */
-export default function ManualDocsWizard({ open, onClose, proprietaires, defaultProprietaireId, defaultDateDebut, defaultDateFin, uniteDescription, allowAvenant, lockCoreFields = false }) {
+export default function ManualDocsWizard({ open, onClose, proprietaires, defaultProprietaireId, defaultDateDebut, defaultDateFin, uniteDescription, allowAvenant, lockCoreFields = false, initialMode, defaultMandatId, unitOwners = [], onBeforeSave, uniteId }) {
   const { data: me } = useGetMeQuery();
   const [createMandat, { isLoading: isSavingMandat }] = useCreateMandatMutation();
   const [createAvenant, { isLoading: isSavingAvenant }] = useCreateAvenantMutation();
   // step: 0 select mode, 1 mandat form, 2 avenant form, 3 done
-  const [step, setStep] = useState(0);
-  const [mode, setMode] = useState('both'); // 'mandat' | 'avenant' | 'both'
+  const [step, setStep] = useState(initialMode === 'mandat' ? 1 : initialMode === 'avenant' ? 2 : 0);
+  const [mode, setMode] = useState(initialMode || 'both'); // 'mandat' | 'avenant' | 'both'
   const [mandat, setMandat] = useState({
     proprietaire_id: defaultProprietaireId || '',
     date_debut: defaultDateDebut || '',
@@ -45,7 +54,7 @@ export default function ManualDocsWizard({ open, onClose, proprietaires, default
   });
 
   const [avenant, setAvenant] = useState({
-    mandat_id: null,
+    mandat_id: defaultMandatId || null,
     reference: '',
     date_pouvoir_initial: '',
     objet_resume: '',
@@ -86,6 +95,9 @@ export default function ManualDocsWizard({ open, onClose, proprietaires, default
     const e = {};
     // Seulement le propriétaire est obligatoire, tout le reste est optionnel
     if (!mandat.proprietaire_id) e.proprietaire_id = 'Choisir un propriétaire';
+    if (!mandat.date_debut) e.date_debut = 'Date début requise';
+    if (!mandat.date_fin) e.date_fin = 'Date fin requise';
+    
     // Validation dates si elles sont présentes
     if (mandat.date_fin && mandat.date_debut && mandat.date_fin < mandat.date_debut) {
       e.date_fin = 'Date fin doit être >= date début';
@@ -105,8 +117,13 @@ export default function ManualDocsWizard({ open, onClose, proprietaires, default
     setErrors(e);
     if (Object.keys(e).length) return;
     try {
+      if (onBeforeSave) {
+        await onBeforeSave();
+      }
+
       const payload = {
         ...mandat,
+        unite_id: uniteId ? Number(uniteId) : undefined,
         proprietaire_id: Number(mandat.proprietaire_id),
         taux_gestion_pct: mandat.taux_gestion_pct ? Number(mandat.taux_gestion_pct) : null,
         tva_taux: mandat.tva_taux ? Number(mandat.tva_taux) : null,
@@ -149,1168 +166,708 @@ export default function ManualDocsWizard({ open, onClose, proprietaires, default
   };
 
   const closeAndReset = () => {
-    setStep(0);
-    setMode('both');
+    const isSuccess = step === 3;
+    setStep(initialMode === 'mandat' ? 1 : initialMode === 'avenant' ? 2 : 0);
+    setMode(initialMode || 'both');
     setCreatedMandat(null);
     setCreatedAvenant(null);
     setErrors({});
     setAvenantErrors({});
-    onClose();
+    onClose(isSuccess);
   };
 
   const chooseStep = (
-    <div className="p-4 p-md-5">
-      
-      
-      <div className="row g-3">
+    <div className="p-4 md:p-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Mandat uniquement */}
-        <div className="col-12 col-md-4">
-          <div 
-            className={`card border-0 shadow-sm h-100 ${mode === 'mandat' ? 'shadow' : ''}`} 
-            style={{ 
-              cursor: 'pointer',
-              background: mode === 'mandat' 
-                ? 'linear-gradient(135deg, #dbeafe, #e0e7ff)' 
-                : '#ffffff',
-              border: mode === 'mandat' ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-              transition: 'all 0.3s ease',
-              transform: mode === 'mandat' ? 'scale(1.02)' : 'scale(1)'
-            }} 
-            onClick={() => setMode('mandat')}
-            onMouseEnter={(e) => {
-              if (mode !== 'mandat') {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (mode !== 'mandat') {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '';
-              }
-            }}>
-            <div className="card-body text-center p-4">
-              <div className="form-check d-flex justify-content-center mb-3">
-                <input 
-                  type="radio" 
-                  className="form-check-input" 
-                  style={{ width: '24px', height: '24px', cursor: 'pointer' }}
-                  name="mode" 
-                  checked={mode === 'mandat'} 
-                  onChange={() => setMode('mandat')} 
-                />
-              </div>
-              <div className="p-3 rounded-3 d-inline-flex mb-3" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
-                <i className="bi bi-file-text" style={{ fontSize: '2.5rem', color: '#3b82f6' }}></i>
-              </div>
-              <div className="fw-bold mb-2" style={{ fontSize: '1rem', color: '#1e293b' }}>
-                Mandat uniquement
-              </div>
-              <small className="text-muted d-block">Créer un nouveau mandat de gestion</small>
+        <Card 
+          className={cn("cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg", mode === 'mandat' ? 'border-blue-500 ring-2 ring-blue-200' : '')}
+          style={{ background: mode === 'mandat' ? 'linear-gradient(135deg, #dbeafe, #e0e7ff)' : '#ffffff' }}
+          onClick={() => setMode('mandat')}
+        >
+          <CardContent className="text-center p-6">
+            <div className="flex justify-center mb-3">
+              <input type="radio" className="h-6 w-6 cursor-pointer" checked={mode === 'mandat'} onChange={() => setMode('mandat')} />
             </div>
-          </div>
-        </div>
+            <div className="p-3 rounded-lg inline-flex mb-3" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
+              <i className="bi bi-file-text text-4xl text-blue-500"></i>
+            </div>
+            <div className="font-bold mb-2 text-slate-800">Mandat uniquement</div>
+            <small className="text-muted-foreground block">Créer un nouveau mandat de gestion</small>
+          </CardContent>
+        </Card>
         
         {/* Avenant uniquement */}
-        <div className="col-12 col-md-4">
-          <div 
-            className={`card border-0 shadow-sm h-100 ${mode === 'avenant' ? 'shadow' : ''}`} 
-            style={{ 
-              cursor: 'pointer',
-              background: mode === 'avenant' 
-                ? 'linear-gradient(135deg, #fef3c7, #fde68a)' 
-                : '#ffffff',
-              border: mode === 'avenant' ? '2px solid #f59e0b' : '1px solid #e5e7eb',
-              transition: 'all 0.3s ease',
-              transform: mode === 'avenant' ? 'scale(1.02)' : 'scale(1)'
-            }} 
-            onClick={() => setMode('avenant')}
-            onMouseEnter={(e) => {
-              if (mode !== 'avenant') {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (mode !== 'avenant') {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '';
-              }
-            }}>
-            <div className="card-body text-center p-4">
-              <div className="form-check d-flex justify-content-center mb-3">
-                <input 
-                  type="radio" 
-                  className="form-check-input" 
-                  style={{ width: '24px', height: '24px', cursor: 'pointer' }}
-                  name="mode" 
-                  checked={mode === 'avenant'} 
-                  onChange={() => setMode('avenant')} 
-                />
-              </div>
-              <div className="p-3 rounded-3 d-inline-flex mb-3" style={{ background: 'rgba(245, 158, 11, 0.1)' }}>
-                <i className="bi bi-file-earmark-plus" style={{ fontSize: '2.5rem', color: '#f59e0b' }}></i>
-              </div>
-              <div className="fw-bold mb-2" style={{ fontSize: '1rem', color: '#1e293b' }}>
-                Avenant uniquement
-              </div>
-              <small className="text-muted d-block">Créer un avenant pour un mandat existant</small>
+        <Card 
+          className={cn("cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg", mode === 'avenant' ? 'border-amber-500 ring-2 ring-amber-200' : '')}
+          style={{ background: mode === 'avenant' ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : '#ffffff' }}
+          onClick={() => setMode('avenant')}
+        >
+          <CardContent className="text-center p-6">
+            <div className="flex justify-center mb-3">
+              <input type="radio" className="h-6 w-6 cursor-pointer" checked={mode === 'avenant'} onChange={() => setMode('avenant')} />
             </div>
-          </div>
-        </div>
+            <div className="p-3 rounded-lg inline-flex mb-3" style={{ background: 'rgba(245, 158, 11, 0.1)' }}>
+              <i className="bi bi-file-earmark-plus text-4xl text-amber-500"></i>
+            </div>
+            <div className="font-bold mb-2 text-slate-800">Avenant uniquement</div>
+            <small className="text-muted-foreground block">Créer un avenant pour un mandat existant</small>
+          </CardContent>
+        </Card>
         
         {/* Les deux */}
-        <div className="col-12 col-md-4">
-          <div 
-            className={`card border-0 shadow-sm h-100 ${mode === 'both' ? 'shadow' : ''}`} 
-            style={{ 
-              cursor: 'pointer',
-              background: mode === 'both' 
-                ? 'linear-gradient(135deg, #d1fae5, #a7f3d0)' 
-                : '#ffffff',
-              border: mode === 'both' ? '2px solid #10b981' : '1px solid #e5e7eb',
-              transition: 'all 0.3s ease',
-              transform: mode === 'both' ? 'scale(1.02)' : 'scale(1)'
-            }} 
-            onClick={() => setMode('both')}
-            onMouseEnter={(e) => {
-              if (mode !== 'both') {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.12)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (mode !== 'both') {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '';
-              }
-            }}>
-            <div className="card-body text-center p-4">
-              <div className="form-check d-flex justify-content-center mb-3">
-                <input 
-                  type="radio" 
-                  className="form-check-input" 
-                  style={{ width: '24px', height: '24px', cursor: 'pointer' }}
-                  name="mode" 
-                  checked={mode === 'both'} 
-                  onChange={() => setMode('both')} 
-                />
-              </div>
-              <div className="p-3 rounded-3 d-inline-flex mb-3" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
-                <i className="bi bi-files" style={{ fontSize: '2.5rem', color: '#10b981' }}></i>
-              </div>
-              <div className="fw-bold mb-2" style={{ fontSize: '1rem', color: '#1e293b' }}>
-                Les deux
-              </div>
-              <small className="text-muted d-block">Mandat et avenant en une seule étape</small>
+        <Card 
+          className={cn("cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg", mode === 'both' ? 'border-emerald-500 ring-2 ring-emerald-200' : '')}
+          style={{ background: mode === 'both' ? 'linear-gradient(135deg, #d1fae5, #a7f3d0)' : '#ffffff' }}
+          onClick={() => setMode('both')}
+        >
+          <CardContent className="text-center p-6">
+            <div className="flex justify-center mb-3">
+              <input type="radio" className="h-6 w-6 cursor-pointer" checked={mode === 'both'} onChange={() => setMode('both')} />
             </div>
-          </div>
-        </div>
+            <div className="p-3 rounded-lg inline-flex mb-3" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
+              <i className="bi bi-files text-4xl text-emerald-500"></i>
+            </div>
+            <div className="font-bold mb-2 text-slate-800">Les deux</div>
+            <small className="text-muted-foreground block">Mandat et avenant en une seule étape</small>
+          </CardContent>
+        </Card>
       </div>
-      <div className="d-flex justify-content-end mt-4 gap-2">
-        <button 
-          type="button" 
-          className="btn text-white fw-semibold shadow-sm px-4 py-2 d-flex align-items-center gap-2"
-          style={{
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-            border: 'none',
-            borderRadius: '8px',
-            transition: 'all 0.3s ease'
-          }}
+      <div className="flex justify-end mt-6 gap-2">
+        <Button 
+          className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md"
           onClick={() => setStep(mode === 'avenant' ? 2 : 1)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '';
-          }}>
-          Continuer
-          <i className="bi bi-arrow-right"></i>
-        </button>
+        >
+          Continuer <i className="bi bi-arrow-right"></i>
+        </Button>
       </div>
     </div>
   );
 
   const mandatForm = (
-    <div className="p-4 p-md-5" style={{ background: '#f8fafc' }}>
-      <div className="mb-4">
-        <div className="d-flex align-items-center gap-3 mb-2">
-          <div className="d-inline-flex align-items-center justify-content-center rounded-3" 
-               style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
-            <i className="bi bi-file-text" style={{ fontSize: '1.5rem', color: '#ffffff' }}></i>
+    <div className="p-4 md:p-6 bg-slate-50">
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="inline-flex items-center justify-center rounded-lg w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600">
+            <i className="bi bi-file-text text-2xl text-white"></i>
           </div>
           <div>
-            <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>Nouveau Mandat de gestion</h5>
-            <p className="text-muted mb-0 small">Remplissez les informations du mandat</p>
+            <h5 className="font-bold text-slate-800 text-lg">Nouveau Mandat de gestion</h5>
+            <p className="text-muted-foreground text-sm">Remplissez les informations du mandat</p>
           </div>
         </div>
       </div>
 
       {/* Section: Informations principales */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #e0e7ff'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#dbeafe' }}>
-              <i className="bi bi-person-circle" style={{ fontSize: '1rem', color: '#3b82f6' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-indigo-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-blue-100">
+              <i className="bi bi-person-circle text-blue-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Propriétaire et période</h6>
+            <h6 className="font-bold text-slate-800">Propriétaire et période</h6>
           </div>
-        <div className="row g-3">
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Propriétaire et période</h6>
-          </div>
-          <div className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Propriétaire <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <select 
-                className={`form-select ${errors.proprietaire_id ? 'is-invalid' : ''}`} 
-                value={mandat.proprietaire_id} 
-                onChange={e => setMandat(m => ({ ...m, proprietaire_id: e.target.value }))} 
-                disabled={lockCoreFields && !!mandat.proprietaire_id}
-                style={{ 
-                  borderColor: errors.proprietaire_id ? '#ef4444' : '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }}>
-                <option value="">Sélectionner un propriétaire...</option>
-                {proprietaires.map(p => <option key={p.id} value={p.id}>{p.nom_raison || p.email || `#${p.id}`}</option>)}
-              </select>
-              {errors.proprietaire_id && <div className="invalid-feedback" style={{ fontSize: '0.85rem' }}>{errors.proprietaire_id}</div>}
-              {lockCoreFields && mandat.proprietaire_id && (
-                <div className="form-text" style={{ color: '#0ea5e9', fontSize: '0.85rem' }}>
-                  <i className="bi bi-lock-fill me-1"></i>Défini par la répartition de l'unité
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-1">
+              {unitOwners.length > 0 ? (
+                <div className="mb-4">
+                  <Label className="mb-2 block text-slate-700">Propriétaires (Indivision)</Label>
+                  <div className="bg-slate-50 rounded-md border p-2 space-y-1 mb-2">
+                    {unitOwners.map((o, i) => (
+                      <div key={i} className="flex justify-between text-sm items-center p-1 hover:bg-slate-100 rounded">
+                        <span className="font-medium text-slate-700">{o.nom}</span>
+                        <span className="font-mono text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{o.parts}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <Label className="mb-2 block text-slate-700">Propriétaire <span className="text-red-500">*</span></Label>
+                  <Select 
+                    value={String(mandat.proprietaire_id)} 
+                    onValueChange={val => setMandat(m => ({ ...m, proprietaire_id: val }))}
+                    disabled={lockCoreFields && !!mandat.proprietaire_id}
+                  >
+                    <SelectTrigger className={cn(errors.proprietaire_id ? "border-red-500" : "")}>
+                      <SelectValue placeholder="Sélectionner un propriétaire..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {proprietaires.map(p => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.nom_raison || p.email || `#${p.id}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.proprietaire_id && <div className="text-red-500 text-xs mt-1">{errors.proprietaire_id}</div>}
+                  {lockCoreFields && mandat.proprietaire_id && (
+                    <div className="text-sky-500 text-xs mt-1 flex items-center gap-1">
+                      <i className="bi bi-lock-fill"></i> Défini par la répartition de l'unité
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            <div className="col-md-3">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Date début
-              </label>
-              <input 
-                type="date" 
-                className={`form-control ${errors.date_debut ? 'is-invalid' : ''}`} 
-                value={mandat.date_debut} 
-                onChange={e => setMandat(m => ({ ...m, date_debut: e.target.value }))} 
-                disabled={lockCoreFields}
-                style={{ 
-                  borderColor: errors.date_debut ? '#ef4444' : '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
-              {errors.date_debut && <div className="invalid-feedback" style={{ fontSize: '0.85rem' }}>{errors.date_debut}</div>}
-              {lockCoreFields && (
-                <div className="form-text" style={{ color: '#0ea5e9', fontSize: '0.85rem' }}>
-                  <i className="bi bi-lock-fill me-1"></i>Défini automatiquement
-                </div>
-              )}
-            </div>
-            <div className="col-md-3">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Date fin
-              </label>
-              <input 
-                type="date" 
-                className={`form-control ${errors.date_fin ? 'is-invalid' : ''}`} 
-                value={mandat.date_fin} 
-                onChange={e => setMandat(m => ({ ...m, date_fin: e.target.value }))} 
-                disabled={lockCoreFields}
-                style={{ 
-                  borderColor: errors.date_fin ? '#ef4444' : '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
-              {errors.date_fin && <div className="invalid-feedback" style={{ fontSize: '0.85rem' }}>{errors.date_fin}</div>}
-              {lockCoreFields && (
-                <div className="form-text" style={{ color: '#0ea5e9', fontSize: '0.85rem' }}>
-                  <i className="bi bi-lock-fill me-1"></i>Défini automatiquement
-                </div>
-              )}
+            <div className="grid grid-cols-2 gap-4 md:col-span-1">
+              <div>
+                <Label className="mb-2 block text-slate-700">Date début <span className="text-red-500">*</span></Label>
+                <Input 
+                  type="date" 
+                  value={mandat.date_debut} 
+                  onChange={e => setMandat(m => ({ ...m, date_debut: e.target.value }))} 
+                  disabled={lockCoreFields}
+                  className={cn(errors.date_debut ? "border-red-500" : "")}
+                />
+                {errors.date_debut && <div className="text-red-500 text-xs mt-1">{errors.date_debut}</div>}
+              </div>
+              <div>
+                <Label className="mb-2 block text-slate-700">Date fin <span className="text-red-500">*</span></Label>
+                <Input 
+                  type="date" 
+                  value={mandat.date_fin} 
+                  onChange={e => setMandat(m => ({ ...m, date_fin: e.target.value }))} 
+                  disabled={lockCoreFields}
+                  className={cn(errors.date_fin ? "border-red-500" : "")}
+                />
+                {errors.date_fin && <div className="text-red-500 text-xs mt-1">{errors.date_fin}</div>}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Section: Honoraires */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #d1fae5'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#d1fae5' }}>
-              <i className="bi bi-cash-coin" style={{ fontSize: '1rem', color: '#10b981' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-emerald-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-emerald-100">
+              <i className="bi bi-cash-coin text-emerald-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Honoraires et gestion</h6>
+            <h6 className="font-bold text-slate-800">Honoraires et gestion</h6>
           </div>
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Taux de gestion (%)
-              </label>
-              <div className="input-group">
-                <input 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="mb-2 block text-slate-700">Taux de gestion (%)</Label>
+              <div className="relative">
+                <Input 
                   type="number" 
                   step="0.01" 
-                  className="form-control" 
                   value={mandat.taux_gestion_pct} 
                   onChange={e => setMandat(m => ({ ...m, taux_gestion_pct: e.target.value }))} 
                   placeholder="0.00"
-                  style={{ 
-                    borderColor: '#cbd5e1',
-                    fontSize: '0.95rem',
-                    padding: '0.65rem 0.75rem'
-                  }} />
-                <span className="input-group-text" style={{ background: '#f1f5f9', borderColor: '#cbd5e1', color: '#64748b' }}>%</span>
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-2.5 text-slate-400 text-sm">%</span>
               </div>
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Langue
-              </label>
-              <select 
-                className="form-select" 
-                value={mandat.langue} 
-                onChange={e => setMandat(m => ({ ...m, langue: e.target.value }))}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }}>
-                <option value="fr">🇫🇷 Français</option>
-                <option value="ar">🇲🇦 Arabe</option>
-                <option value="ar_fr">🇲🇦🇫🇷 Ar + Fr</option>
-              </select>
+            <div>
+              <Label className="mb-2 block text-slate-700">Langue</Label>
+              <Select value={mandat.langue} onValueChange={val => setMandat(m => ({ ...m, langue: val }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                  <SelectItem value="ar">🇲🇦 Arabe</SelectItem>
+                  <SelectItem value="ar_fr">🇲🇦🇫🇷 Ar + Fr</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Statut
-              </label>
-              <select 
-                className="form-select" 
-                value={mandat.statut} 
-                onChange={e => setMandat(m => ({ ...m, statut: e.target.value }))}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }}>
-                <option value="brouillon">📝 Brouillon</option>
-                <option value="en_validation">⏳ En validation</option>
-                <option value="signe">✅ Signé</option>
-                <option value="actif">🟢 Actif</option>
-                <option value="resilie">🔴 Résilié</option>
-              </select>
+            <div>
+              <Label className="mb-2 block text-slate-700">Statut</Label>
+              <Select value={mandat.statut} onValueChange={val => setMandat(m => ({ ...m, statut: val }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="brouillon">📝 Brouillon</SelectItem>
+                  <SelectItem value="en_validation">⏳ En validation</SelectItem>
+                  <SelectItem value="signe">✅ Signé</SelectItem>
+                  <SelectItem value="actif">🟢 Actif</SelectItem>
+                  <SelectItem value="resilie">🔴 Résilié</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Section: Description */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #fef3c7'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#fef3c7' }}>
-              <i className="bi bi-file-earmark-text" style={{ fontSize: '1rem', color: '#f59e0b' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-amber-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-amber-100">
+              <i className="bi bi-file-earmark-text text-amber-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Description et clauses</h6>
+            <h6 className="font-bold text-slate-800">Description et clauses</h6>
           </div>
-          <div className="row g-3">
-            <div className="col-12">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Description du bien
-              </label>
-              <textarea 
-                className="form-control" 
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-2 block text-slate-700">Description du bien</Label>
+              <Textarea 
                 rows={2} 
                 value={mandat.description_bien} 
                 onChange={e => setMandat(m => ({ ...m, description_bien: e.target.value }))} 
                 placeholder="Décrire le bien géré..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-12">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Pouvoirs accordés / Texte
-              </label>
-              <textarea 
-                className="form-control" 
+            <div>
+              <Label className="mb-2 block text-slate-700">Pouvoirs accordés / Texte</Label>
+              <Textarea 
                 rows={3} 
                 value={mandat.pouvoirs_accordes} 
                 onChange={e => setMandat(m => ({ ...m, pouvoirs_accordes: e.target.value }))} 
                 placeholder="Détailler les pouvoirs accordés au gestionnaire..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-12">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Clauses / Notes additionnelles
-              </label>
-              <textarea 
-                className="form-control" 
+            <div>
+              <Label className="mb-2 block text-slate-700">Clauses / Notes additionnelles</Label>
+              <Textarea 
                 rows={2} 
                 value={mandat.notes_clauses} 
                 onChange={e => setMandat(m => ({ ...m, notes_clauses: e.target.value }))} 
                 placeholder="Notes ou clauses particulières..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.75rem'
-                }} />
+              />
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Section: Signature */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #e9d5ff'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#e9d5ff' }}>
-              <i className="bi bi-pen" style={{ fontSize: '1rem', color: '#a855f7' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-purple-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-purple-100">
+              <i className="bi bi-pen text-purple-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Signature</h6>
+            <h6 className="font-bold text-slate-800">Signature</h6>
           </div>
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Date de signature
-              </label>
-              <input 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="mb-2 block text-slate-700">Date de signature</Label>
+              <Input 
                 type="date" 
-                className="form-control" 
                 value={mandat.date_signature} 
                 onChange={e => setMandat(m => ({ ...m, date_signature: e.target.value }))}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Lieu de signature
-              </label>
-              <input 
+            <div>
+              <Label className="mb-2 block text-slate-700">Lieu de signature</Label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={mandat.lieu_signature} 
                 onChange={e => setMandat(m => ({ ...m, lieu_signature: e.target.value }))} 
                 placeholder="Ville ou lieu..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Fichier URL (optionnel)
-              </label>
-              <input 
+            <div>
+              <Label className="mb-2 block text-slate-700">Fichier URL (optionnel)</Label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={mandat.fichier_url} 
                 onChange={e => setMandat(m => ({ ...m, fichier_url: e.target.value }))} 
                 placeholder="https://..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="d-flex justify-content-between mt-4 gap-3">
-        <button 
-          type="button" 
-          className="btn px-4 d-flex align-items-center gap-2" 
-          disabled={isSavingMandat} 
+      <div className="flex justify-between mt-6 gap-3">
+        <Button 
+          variant="outline"
           onClick={() => setStep(0)}
-          style={{
-            background: '#ffffff',
-            border: '2px solid #e2e8f0',
-            color: '#64748b',
-            borderRadius: '8px',
-            fontWeight: '600',
-            padding: '0.5rem 1.25rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f8fafc';
-            e.currentTarget.style.borderColor = '#cbd5e1';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#ffffff';
-            e.currentTarget.style.borderColor = '#e2e8f0';
-          }}>
-          <i className="bi bi-arrow-left"></i>
-          Précédent
-        </button>
-        <button 
-          type="button" 
-          className="btn px-4 d-flex align-items-center gap-2" 
-          disabled={isSavingMandat} 
+          disabled={isSavingMandat}
+          className="gap-2"
+        >
+          <i className="bi bi-arrow-left"></i> Précédent
+        </Button>
+        <Button 
           onClick={saveMandat}
-          style={{
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-            border: 'none',
-            color: '#ffffff',
-            borderRadius: '8px',
-            fontWeight: '600',
-            padding: '0.5rem 1.25rem',
-            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
-          }}>
+          disabled={isSavingMandat}
+          className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md"
+        >
           {isSavingMandat ? (
             <>
-              <span className="spinner-border spinner-border-sm"></span>
-              Création en cours...
+              <span className="animate-spin mr-2 h-4 w-4 border-2 border-b-transparent border-white rounded-full"></span>
+              Création...
             </>
           ) : (
             <>
-              <i className="bi bi-check-circle"></i>
-              Créer le mandat
+              <i className="bi bi-check-circle"></i> Créer le mandat
             </>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );
 
   const avenantForm = (
-    <div className="p-4 p-md-5" style={{ background: '#f8fafc' }}>
-      <div className="mb-4">
-        <div className="d-flex align-items-center gap-3 mb-2">
-          <div className="d-inline-flex align-items-center justify-content-center rounded-3" 
-               style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-            <i className="bi bi-file-earmark-plus" style={{ fontSize: '1.5rem', color: '#ffffff' }}></i>
+    <div className="p-4 md:p-6 bg-slate-50">
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="inline-flex items-center justify-center rounded-lg w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600">
+            <i className="bi bi-file-earmark-plus text-2xl text-white"></i>
           </div>
           <div>
-            <h5 className="fw-bold mb-1" style={{ color: '#1e293b' }}>Nouvel Avenant</h5>
-            <p className="text-muted mb-0 small">Remplissez les informations de l'avenant</p>
+            <h5 className="font-bold text-slate-800 text-lg">Nouvel Avenant</h5>
+            <p className="text-muted-foreground text-sm">Remplissez les informations de l'avenant</p>
           </div>
         </div>
       </div>
 
       {/* Section: Identification */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #e0e7ff'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#dbeafe' }}>
-              <i className="bi bi-hash" style={{ fontSize: '1rem', color: '#3b82f6' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-indigo-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-blue-100">
+              <i className="bi bi-hash text-blue-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Identification</h6>
+            <h6 className="font-bold text-slate-800">Identification</h6>
           </div>
-          <div className="row g-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {!createdMandat && (
-              <div className="col-md-4">
-                <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                  ID Mandat <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input 
+              <div>
+                <Label className="mb-2 block text-slate-700">ID Mandat <span className="text-red-500">*</span></Label>
+                <Input 
                   type="number" 
-                  className={`form-control ${avenantErrors.mandat_id ? 'is-invalid' : ''}`} 
                   value={avenant.mandat_id || ''} 
                   onChange={e => setAvenant(a => ({ ...a, mandat_id: e.target.value }))} 
                   placeholder="Ex: 123"
-                  style={{ 
-                    borderColor: avenantErrors.mandat_id ? '#ef4444' : '#cbd5e1',
-                    fontSize: '0.95rem',
-                    padding: '0.65rem 0.75rem'
-                  }} />
-                {avenantErrors.mandat_id && <div className="invalid-feedback" style={{ fontSize: '0.85rem' }}>{avenantErrors.mandat_id}</div>}
+                  className={cn(avenantErrors.mandat_id ? "border-red-500" : "")}
+                />
+                {avenantErrors.mandat_id && <div className="text-red-500 text-xs mt-1">{avenantErrors.mandat_id}</div>}
               </div>
             )}
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Référence
-              </label>
-              <input 
+            <div>
+              <Label className="mb-2 block text-slate-700">Référence</Label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={avenant.reference} 
                 onChange={e => setAvenant(a => ({ ...a, reference: e.target.value }))} 
                 placeholder="AV-2024-..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Statut
-              </label>
-              <select 
-                className="form-select" 
-                value={avenant.statut} 
-                onChange={e => setAvenant(a => ({ ...a, statut: e.target.value }))}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }}>
-                <option value="brouillon">📝 Brouillon</option>
-                <option value="signe">✅ Signé</option>
-                <option value="actif">🟢 Actif</option>
-                <option value="annule">🔴 Annulé</option>
-              </select>
+            <div>
+              <Label className="mb-2 block text-slate-700">Statut</Label>
+              <Select value={avenant.statut} onValueChange={val => setAvenant(a => ({ ...a, statut: val }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="brouillon">📝 Brouillon</SelectItem>
+                  <SelectItem value="signe">✅ Signé</SelectItem>
+                  <SelectItem value="actif">🟢 Actif</SelectItem>
+                  <SelectItem value="annule">🔴 Annulé</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Section: Dates et objet */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #d1fae5'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#d1fae5' }}>
-              <i className="bi bi-calendar-range" style={{ fontSize: '1rem', color: '#10b981' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-emerald-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-emerald-100">
+              <i className="bi bi-calendar-range text-emerald-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Dates et objet</h6>
+            <h6 className="font-bold text-slate-800">Dates et objet</h6>
           </div>
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Date pouvoir initial
-              </label>
-              <input 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="mb-2 block text-slate-700">Date pouvoir initial</Label>
+              <Input 
                 type="date" 
-                className="form-control" 
                 value={avenant.date_pouvoir_initial || ''} 
                 onChange={e => setAvenant(a => ({ ...a, date_pouvoir_initial: e.target.value }))}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Date d'effet
-              </label>
-              <input 
+            <div>
+              <Label className="mb-2 block text-slate-700">Date d'effet</Label>
+              <Input 
                 type="date" 
-                className={`form-control ${avenantErrors.date_effet ? 'is-invalid' : ''}`} 
                 value={avenant.date_effet} 
                 onChange={e => setAvenant(a => ({ ...a, date_effet: e.target.value }))}
-                style={{ 
-                  borderColor: avenantErrors.date_effet ? '#ef4444' : '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
-              {avenantErrors.date_effet && <div className="invalid-feedback" style={{ fontSize: '0.85rem' }}>{avenantErrors.date_effet}</div>}
+                className={cn(avenantErrors.date_effet ? "border-red-500" : "")}
+              />
+              {avenantErrors.date_effet && <div className="text-red-500 text-xs mt-1">{avenantErrors.date_effet}</div>}
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Date de signature
-              </label>
-              <input 
+            <div>
+              <Label className="mb-2 block text-slate-700">Date de signature</Label>
+              <Input 
                 type="date" 
-                className="form-control" 
                 value={avenant.date_signature || ''} 
                 onChange={e => setAvenant(a => ({ ...a, date_signature: e.target.value }))}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-12">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Objet / Résumé
-              </label>
-              <input 
+            <div className="md:col-span-3">
+              <Label className="mb-2 block text-slate-700">Objet / Résumé</Label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={avenant.objet_resume} 
                 onChange={e => setAvenant(a => ({ ...a, objet_resume: e.target.value }))} 
                 placeholder="Bref résumé de l'objet de l'avenant..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Section: Modifications */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #fef3c7'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#fef3c7' }}>
-              <i className="bi bi-pencil-square" style={{ fontSize: '1rem', color: '#f59e0b' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-amber-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-amber-100">
+              <i className="bi bi-pencil-square text-amber-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Modifications et texte</h6>
+            <h6 className="font-bold text-slate-800">Modifications et texte</h6>
           </div>
-          <div className="row g-3">
-            <div className="col-12">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Modifications / Texte détaillé
-              </label>
-              <textarea 
-                className="form-control" 
+          <div className="space-y-4">
+            <div>
+              <Label className="mb-2 block text-slate-700">Modifications / Texte détaillé</Label>
+              <Textarea 
                 rows={4} 
                 value={avenant.modifs_text} 
                 onChange={e => setAvenant(a => ({ ...a, modifs_text: e.target.value }))} 
                 placeholder="Détailler les modifications apportées par cet avenant..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.75rem'
-                }} />
+              />
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Section: Signature et fichier */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <div className="d-flex align-items-center gap-2 mb-4" 
-               style={{ 
-                 paddingBottom: '12px', 
-                 borderBottom: '2px solid #e9d5ff'
-               }}>
-            <div className="d-inline-flex align-items-center justify-content-center rounded-circle" 
-                 style={{ width: '32px', height: '32px', background: '#e9d5ff' }}>
-              <i className="bi bi-pen" style={{ fontSize: '1rem', color: '#a855f7' }}></i>
+      <Card className="border-0 shadow-sm mb-6 rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b-2 border-purple-100">
+            <div className="inline-flex items-center justify-center rounded-full w-8 h-8 bg-purple-100">
+              <i className="bi bi-pen text-purple-500"></i>
             </div>
-            <h6 className="fw-bold mb-0" style={{ color: '#1e293b' }}>Signature et fichier</h6>
+            <h6 className="font-bold text-slate-800">Signature et fichier</h6>
           </div>
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Lieu de signature
-              </label>
-              <input 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="mb-2 block text-slate-700">Lieu de signature</Label>
+              <Input 
                 type="text" 
-                className="form-control" 
                 value={avenant.lieu_signature} 
                 onChange={e => setAvenant(a => ({ ...a, lieu_signature: e.target.value }))} 
                 placeholder="Ville ou lieu..."
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+              />
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Signataire interne (ID)
-              </label>
-              <input 
+            <div>
+              <Label className="mb-2 block text-slate-700">Signataire interne (ID)</Label>
+              <Input 
                 type="number" 
-                className={`form-control ${avenantErrors.rep_b_user_id ? 'is-invalid' : ''}`} 
                 value={avenant.rep_b_user_id || ''} 
                 onChange={e => setAvenant(a => ({ ...a, rep_b_user_id: e.target.value }))} 
                 placeholder="ID utilisateur"
-                style={{ 
-                  borderColor: avenantErrors.rep_b_user_id ? '#ef4444' : '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
-              {avenantErrors.rep_b_user_id && <div className="invalid-feedback" style={{ fontSize: '0.85rem' }}>{avenantErrors.rep_b_user_id}</div>}
+                className={cn(avenantErrors.rep_b_user_id ? "border-red-500" : "")}
+              />
+              {avenantErrors.rep_b_user_id && <div className="text-red-500 text-xs mt-1">{avenantErrors.rep_b_user_id}</div>}
             </div>
-            <div className="col-md-4">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Créé par (ID)
-              </label>
-              <input 
+            <div>
+              <Label className="mb-2 block text-slate-700">Créé par (ID)</Label>
+              <Input 
                 type="number" 
-                className="form-control" 
                 value={avenant.created_by || ''} 
                 onChange={e => setAvenant(a => ({ ...a, created_by: e.target.value }))} 
                 placeholder={`Par défaut: ${me?.id ?? '...'}`}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
-              <div className="form-text" style={{ fontSize: '0.85rem', color: '#64748b' }}>
+              />
+              <div className="text-slate-500 text-xs mt-1">
                 Par défaut: votre ID ({me?.id ?? '...'})
               </div>
             </div>
-            <div className="col-12">
-              <label className="form-label fw-semibold mb-2" style={{ color: '#334155', fontSize: '0.9rem' }}>
-                Fichier (upload)
-              </label>
-              <input 
+            <div className="md:col-span-3">
+              <Label className="mb-2 block text-slate-700">Fichier (upload)</Label>
+              <Input 
                 type="file" 
-                className="form-control" 
                 accept=".pdf,.jpg,.jpeg,.png" 
                 onChange={e => {
                   const file = e.target.files?.[0];
                   setAvenant(a => ({ ...a, file }));
                 }}
-                style={{ 
-                  borderColor: '#cbd5e1',
-                  fontSize: '0.95rem',
-                  padding: '0.65rem 0.75rem'
-                }} />
+                className="cursor-pointer"
+              />
               {avenant.fichier_url && (
-                <div className="alert alert-info mt-2 mb-0 py-2 px-3 d-flex align-items-center gap-2" 
-                     style={{ 
-                       background: '#dbeafe', 
-                       border: '1px solid #93c5fd',
-                       borderRadius: '8px',
-                       fontSize: '0.9rem'
-                     }}>
-                  <i className="bi bi-file-earmark-check" style={{ color: '#3b82f6' }}></i>
-                  <span style={{ color: '#1e40af' }}>Fichier actuel: <a href={avenant.fichier_url} target="_blank" rel="noreferrer" className="alert-link fw-semibold">ouvrir</a></span>
+                <div className="mt-2 py-2 px-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-800">
+                  <i className="bi bi-file-earmark-check text-blue-500"></i>
+                  <span>Fichier actuel: <a href={avenant.fichier_url} target="_blank" rel="noreferrer" className="font-semibold underline hover:text-blue-900">ouvrir</a></span>
                 </div>
               )}
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      <div className="d-flex justify-content-between mt-4 gap-3">
-        <button 
-          type="button" 
-          className="btn px-4 d-flex align-items-center gap-2" 
-          disabled={isSavingAvenant} 
+      <div className="flex justify-between mt-6 gap-3">
+        <Button 
+          variant="outline"
           onClick={() => setStep(mode === 'both' && createdMandat ? 3 : 0)}
-          style={{
-            background: '#ffffff',
-            border: '2px solid #e2e8f0',
-            color: '#64748b',
-            borderRadius: '8px',
-            fontWeight: '600',
-            padding: '0.5rem 1.25rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f8fafc';
-            e.currentTarget.style.borderColor = '#cbd5e1';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#ffffff';
-            e.currentTarget.style.borderColor = '#e2e8f0';
-          }}>
-          <i className="bi bi-arrow-left"></i>
-          Précédent
-        </button>
-        <button 
-          type="button" 
-          className="btn px-4 d-flex align-items-center gap-2" 
-          disabled={isSavingAvenant} 
+          disabled={isSavingAvenant}
+          className="gap-2"
+        >
+          <i className="bi bi-arrow-left"></i> Précédent
+        </Button>
+        <Button 
           onClick={saveAvenant}
-          style={{
-            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-            border: 'none',
-            color: '#ffffff',
-            borderRadius: '8px',
-            fontWeight: '600',
-            padding: '0.5rem 1.25rem',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
-          }}>
+          disabled={isSavingAvenant}
+          className="gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-md"
+        >
           {isSavingAvenant ? (
             <>
-              <span className="spinner-border spinner-border-sm"></span>
-              Création en cours...
+              <span className="animate-spin mr-2 h-4 w-4 border-2 border-b-transparent border-white rounded-full"></span>
+              Création...
             </>
           ) : (
             <>
-              <i className="bi bi-check-circle"></i>
-              Créer l'avenant
+              <i className="bi bi-check-circle"></i> Créer l'avenant
             </>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );
 
   const doneView = (
-    <div className="text-center py-5 px-4">
-      <div className="mb-4">
-        <div className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" 
-             style={{
-               width: '100px',
-               height: '100px',
-               background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)'
-             }}>
-          <i className="bi bi-check-circle-fill" style={{ fontSize: '3.5rem', color: '#10b981' }}></i>
+    <div className="text-center py-12 px-4">
+      <div className="mb-6">
+        <div className="inline-flex items-center justify-center rounded-full w-24 h-24 bg-gradient-to-br from-emerald-100 to-emerald-200 mb-4">
+          <i className="bi bi-check-circle-fill text-5xl text-emerald-500"></i>
         </div>
-        <h4 className="fw-bold mb-2" style={{ color: '#1e293b' }}>Création terminée avec succès !</h4>
-        <p className="text-muted mb-0">Vos documents ont été créés et enregistrés</p>
+        <h4 className="font-bold text-2xl text-slate-800 mb-2">Création terminée avec succès !</h4>
+        <p className="text-muted-foreground">Vos documents ont été créés et enregistrés</p>
       </div>
-      <div className="mb-5 d-flex flex-column align-items-center gap-3">
+      <div className="mb-8 flex flex-col items-center gap-4">
         {createdMandat && (
-          <div className="alert alert-success border-0 shadow-sm d-inline-flex align-items-center px-4 py-3 mb-0" 
-               style={{ 
-                 background: 'linear-gradient(135deg, #dbeafe, #e0e7ff)',
-                 borderRadius: '12px',
-                 minWidth: '300px'
-               }}>
-            <div className="p-2 rounded-circle me-3" style={{ background: 'rgba(59, 130, 246, 0.2)' }}>
-              <i className="bi bi-file-text" style={{ fontSize: '1.5rem', color: '#3b82f6' }}></i>
+          <div className="flex items-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm min-w-[300px]">
+            <div className="p-2 rounded-full bg-blue-100 mr-4">
+              <i className="bi bi-file-text text-2xl text-blue-500"></i>
             </div>
-            <div className="text-start">
-              <div className="fw-bold" style={{ color: '#1e293b' }}>Mandat de gestion</div>
-              <small className="text-muted">Document #{createdMandat.id} créé</small>
+            <div className="text-left">
+              <div className="font-bold text-slate-800">Mandat de gestion</div>
+              <small className="text-slate-500">Document #{createdMandat.id} créé</small>
             </div>
           </div>
         )}
         {createdAvenant && (
-          <div className="alert alert-info border-0 shadow-sm d-inline-flex align-items-center px-4 py-3 mb-0"
-               style={{ 
-                 background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
-                 borderRadius: '12px',
-                 minWidth: '300px'
-               }}>
-            <div className="p-2 rounded-circle me-3" style={{ background: 'rgba(245, 158, 11, 0.2)' }}>
-              <i className="bi bi-file-earmark-plus" style={{ fontSize: '1.5rem', color: '#f59e0b' }}></i>
+          <div className="flex items-center p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl shadow-sm min-w-[300px]">
+            <div className="p-2 rounded-full bg-amber-100 mr-4">
+              <i className="bi bi-file-earmark-plus text-2xl text-amber-500"></i>
             </div>
-            <div className="text-start">
-              <div className="fw-bold" style={{ color: '#1e293b' }}>Avenant au mandat</div>
-              <small className="text-muted">Document #{createdAvenant.id} créé</small>
+            <div className="text-left">
+              <div className="font-bold text-slate-800">Avenant au mandat</div>
+              <small className="text-slate-500">Document #{createdAvenant.id} créé</small>
             </div>
           </div>
         )}
       </div>
-      <div className="d-flex justify-content-center gap-2">
-        <button 
-          type="button" 
-          className="btn text-white fw-semibold shadow-sm px-4 py-2 d-flex align-items-center gap-2"
-          style={{
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            border: 'none',
-            borderRadius: '8px',
-            transition: 'all 0.3s ease'
-          }}
+      <div className="flex justify-center gap-2">
+        <Button 
           onClick={closeAndReset}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '';
-          }}>
-          <i className="bi bi-check-lg"></i>
-          Terminer
-        </button>
+          className="gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md px-6"
+        >
+          <i className="bi bi-check-lg"></i> Terminer
+        </Button>
       </div>
     </div>
   );
 
-  const body = (
-    <div className="modal fade show" style={{ display: 'block', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', zIndex: 1050 }}>
-      <div className="modal-dialog modal-xl modal-dialog-centered" style={{ maxWidth: '70vw' }}>
-        <div className="modal-content border-0" 
-             style={{ 
-               borderRadius: '24px',
-               overflow: 'hidden',
-               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-               maxHeight: '90vh'
-             }}>
-          <div className="modal-header border-0" 
-               style={{
-                 background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-                 padding: '2rem 2rem 1.5rem 2rem'
-               }}>
-            <div className="w-100">
-              {/* Progress indicator */}
-              <div className="d-flex align-items-center justify-content-between mb-4">
-                <div className="d-flex align-items-center gap-2 flex-grow-1">
-                  {/* Step 1 */}
-                  <div className="d-flex align-items-center gap-2">
-                    <div className={`rounded-circle d-flex align-items-center justify-content-center ${step >= 0 ? '' : ''}`} 
-                         style={{ 
-                           width: '44px', 
-                           height: '44px',
-                           background: step >= 0 ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : '#e5e7eb',
-                           color: step >= 0 ? '#ffffff' : '#9ca3af',
-                           fontSize: '16px', 
-                           fontWeight: 'bold',
-                           boxShadow: step >= 0 ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
-                           transition: 'all 0.3s ease'
-                         }}>
-                      {step > 0 ? <i className="bi bi-check-lg"></i> : '1'}
-                    </div>
-                    <div className="d-none d-md-block">
-                      <div className={`small ${step >= 0 ? 'fw-bold' : 'text-muted'}`} 
-                           style={{ color: step >= 0 ? '#1e293b' : '#9ca3af', fontSize: '0.75rem' }}>
-                        Étape 1
-                      </div>
-                      <div className={`small ${step >= 0 ? 'text-primary fw-semibold' : 'text-muted'}`} 
-                           style={{ fontSize: '0.85rem' }}>
-                        Type
-                      </div>
-                    </div>
+  return (
+    <Dialog open={true} onOpenChange={closeAndReset}>
+      <DialogContent className="max-w-5xl p-0 overflow-hidden rounded-3xl border-0 shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-8 border-b border-slate-200">
+          <div className="w-full">
+            {/* Progress indicator */}
+            <div className="flex items-center justify-between mb-4">
+              {initialMode ? <div className="flex-grow"></div> : (
+              <div className="flex items-center gap-2 flex-grow">
+                {/* Step 1 */}
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "rounded-full flex items-center justify-center w-11 h-11 text-base font-bold transition-all duration-300",
+                    step >= 0 ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30" : "bg-slate-200 text-slate-400"
+                  )}>
+                    {step > 0 ? <i className="bi bi-check-lg"></i> : '1'}
                   </div>
-                  
-                  {/* Connector */}
-                  <div className="flex-grow-1 mx-2" 
-                       style={{ 
-                         height: '3px',
-                         background: step >= 1 
-                           ? 'linear-gradient(90deg, #3b82f6, #2563eb)' 
-                           : '#e5e7eb',
-                         borderRadius: '2px',
-                         minWidth: '30px',
-                         maxWidth: '100px',
-                         transition: 'all 0.3s ease'
-                       }}></div>
-                  
-                  {/* Step 2 */}
-                  <div className="d-flex align-items-center gap-2">
-                    <div className={`rounded-circle d-flex align-items-center justify-content-center`} 
-                         style={{ 
-                           width: '44px', 
-                           height: '44px',
-                           background: step >= 1 ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : '#e5e7eb',
-                           color: step >= 1 ? '#ffffff' : '#9ca3af',
-                           fontSize: '16px', 
-                           fontWeight: 'bold',
-                           boxShadow: step >= 1 ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
-                           transition: 'all 0.3s ease'
-                         }}>
-                      {step > 1 ? <i className="bi bi-check-lg"></i> : '2'}
+                  <div className="hidden md:block">
+                    <div className={cn("text-xs font-bold", step >= 0 ? "text-slate-800" : "text-slate-400")}>
+                      Étape 1
                     </div>
-                    <div className="d-none d-md-block">
-                      <div className={`small ${step >= 1 ? 'fw-bold' : 'text-muted'}`} 
-                           style={{ color: step >= 1 ? '#1e293b' : '#9ca3af', fontSize: '0.75rem' }}>
-                        Étape 2
-                      </div>
-                      <div className={`small ${step >= 1 ? 'text-primary fw-semibold' : 'text-muted'}`} 
-                           style={{ fontSize: '0.85rem' }}>
-                        Informations
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Connector */}
-                  <div className="flex-grow-1 mx-2" 
-                       style={{ 
-                         height: '3px',
-                         background: step >= 3 
-                           ? 'linear-gradient(90deg, #10b981, #059669)' 
-                           : '#e5e7eb',
-                         borderRadius: '2px',
-                         minWidth: '30px',
-                         maxWidth: '100px',
-                         transition: 'all 0.3s ease'
-                       }}></div>
-                  
-                  {/* Step 3 */}
-                  <div className="d-flex align-items-center gap-2">
-                    <div className={`rounded-circle d-flex align-items-center justify-content-center`} 
-                         style={{ 
-                           width: '44px', 
-                           height: '44px',
-                           background: step >= 3 
-                             ? 'linear-gradient(135deg, #10b981, #059669)' 
-                             : '#e5e7eb',
-                           color: step >= 3 ? '#ffffff' : '#9ca3af',
-                           fontSize: '16px', 
-                           fontWeight: 'bold',
-                           boxShadow: step >= 3 ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none',
-                           transition: 'all 0.3s ease'
-                         }}>
-                      {step >= 3 ? <i className="bi bi-check-lg"></i> : '3'}
-                    </div>
-                    <div className="d-none d-md-block">
-                      <div className={`small ${step >= 3 ? 'fw-bold' : 'text-muted'}`} 
-                           style={{ color: step >= 3 ? '#1e293b' : '#9ca3af', fontSize: '0.75rem' }}>
-                        Étape 3
-                      </div>
-                      <div className={`small ${step >= 3 ? 'text-success fw-semibold' : 'text-muted'}`} 
-                           style={{ fontSize: '0.85rem' }}>
-                        Terminé
-                      </div>
+                    <div className={cn("text-sm font-semibold", step >= 0 ? "text-blue-600" : "text-slate-400")}>
+                      Type
                     </div>
                   </div>
                 </div>
                 
-                <button 
-                  type="button" 
-                  className="btn-close ms-3" 
-                  onClick={closeAndReset}
-                  style={{
-                    padding: '0.75rem',
-                    opacity: 0.6
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6} />
+                {/* Connector */}
+                <div className={cn(
+                  "flex-grow mx-2 h-1 rounded-full min-w-[30px] max-w-[100px] transition-all duration-300",
+                  step >= 1 ? "bg-gradient-to-r from-blue-500 to-blue-600" : "bg-slate-200"
+                )}></div>
+                
+                {/* Step 2 */}
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "rounded-full flex items-center justify-center w-11 h-11 text-base font-bold transition-all duration-300",
+                    step >= 1 ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30" : "bg-slate-200 text-slate-400"
+                  )}>
+                    {step > 1 ? <i className="bi bi-check-lg"></i> : '2'}
+                  </div>
+                  <div className="hidden md:block">
+                    <div className={cn("text-xs font-bold", step >= 1 ? "text-slate-800" : "text-slate-400")}>
+                      Étape 2
+                    </div>
+                    <div className={cn("text-sm font-semibold", step >= 1 ? "text-blue-600" : "text-slate-400")}>
+                      Informations
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Connector */}
+                <div className={cn(
+                  "flex-grow mx-2 h-1 rounded-full min-w-[30px] max-w-[100px] transition-all duration-300",
+                  step >= 3 ? "bg-gradient-to-r from-emerald-500 to-emerald-600" : "bg-slate-200"
+                )}></div>
+                
+                {/* Step 3 */}
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "rounded-full flex items-center justify-center w-11 h-11 text-base font-bold transition-all duration-300",
+                    step >= 3 ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30" : "bg-slate-200 text-slate-400"
+                  )}>
+                    {step >= 3 ? <i className="bi bi-check-lg"></i> : '3'}
+                  </div>
+                  <div className="hidden md:block">
+                    <div className={cn("text-xs font-bold", step >= 3 ? "text-slate-800" : "text-slate-400")}>
+                      Étape 3
+                    </div>
+                    <div className={cn("text-sm font-semibold", step >= 3 ? "text-emerald-600" : "text-slate-400")}>
+                      Terminé
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h4 className="modal-title fw-bold mb-0" style={{ color: '#1e293b' }}>
-                {step === 0 && 'Assistant de création de documents'}
-                {step === 1 && 'Mandat de gestion'}
-                {step === 2 && 'Avenant au mandat'}
-                {step === 3 && 'Finalisation'}
-              </h4>
+              )}
             </div>
-          </div>
-          <div className="modal-body p-0" style={{ background: '#ffffff', overflowY: step === 0 ? 'visible' : 'auto', maxHeight: step === 0 ? 'none' : 'calc(90vh - 180px)' }}>
-            {step === 0 && chooseStep}
-            {step === 1 && mandatForm}
-            {step === 2 && avenantForm}
-            {step === 3 && doneView}
+            <DialogTitle className="font-bold text-slate-800 text-xl">
+              {step === 0 && 'Assistant de création de documents'}
+              {step === 1 && 'Mandat de gestion'}
+              {step === 2 && 'Avenant au mandat'}
+              {step === 3 && 'Finalisation'}
+            </DialogTitle>
           </div>
         </div>
-      </div>
-    </div>
+        <div className="bg-white overflow-y-auto flex-grow">
+          {step === 0 && chooseStep}
+          {step === 1 && mandatForm}
+          {step === 2 && avenantForm}
+          {step === 3 && doneView}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
-
-  return createPortal(body, document.body);
 }

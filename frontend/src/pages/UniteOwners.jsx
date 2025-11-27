@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useAuthz from '@/hooks/useAuthz';
-import { useGetProprietairesQuery, useGetUniteOwnerGroupsQuery, useSaveUniteOwnerGroupMutation } from '../api/baseApi';
+import { useGetProprietairesQuery, useGetUniteOwnerGroupsQuery, useSaveUniteOwnerGroupMutation, useGetMandatsQuery, useUpdateMandatMutation } from '../api/baseApi';
 import GenerationResultModal from '../components/GenerationResultModal';
 import ManualDocsWizard from '../components/ManualDocsWizard';
 import { Button } from '@/components/ui/button';
@@ -17,12 +17,16 @@ export default function UniteOwners() {
   const navigate = useNavigate();
   const { data: ownersListData } = useGetProprietairesQuery();
   const { data: groups, isFetching, refetch } = useGetUniteOwnerGroupsQuery(uniteId);
+  const { data: mandatsData } = useGetMandatsQuery({ unite_id: uniteId });
   const [saveGroup, { isLoading: isSaving }] = useSaveUniteOwnerGroupMutation();
+  const [updateMandat] = useUpdateMandatMutation();
 
   const canView = can('unites.ownership.view');
   const canManage = can('unites.ownership.manage');
 
   const proprietaires = ownersListData?.data || ownersListData || [];
+  const mandats = mandatsData?.data || mandatsData || [];
+
   const ownersById = useMemo(() => {
     const map = {};
     for (const p of proprietaires) map[p.id] = p;
@@ -43,7 +47,11 @@ export default function UniteOwners() {
   const [showModal, setShowModal] = useState(false);
   const [modalItems, setModalItems] = useState([]);
   const [showManualWizard, setShowManualWizard] = useState(false);
+  const [wizardMode, setWizardMode] = useState('mandat'); // 'mandat' or 'avenant'
+  const [activeMandatId, setActiveMandatId] = useState(null);
   const [submitError, setSubmitError] = useState(null);
+  const [isEditingActive, setIsEditingActive] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState(null);
 
   const { total, totalPct, isValidTotal, errors } = useMemo(() => {
     let sum = 0; const validationErrors = [];
@@ -99,17 +107,45 @@ export default function UniteOwners() {
     if (!canManage) return;
     setSubmitError(null);
     if (!isValidTotal) return;
-    if (activeGroup && !activeGroup.date_fin && dateDebut !== activeGroup.date_debut) {
+    
+    // Check if we are editing the active period
+    const isEditing = isEditingActive || (activeGroup && activeGroup.date_debut === dateDebut);
+
+    if (!isEditing && activeGroup && !activeGroup.date_fin && dateDebut !== activeGroup.date_debut) {
       setSubmitError('Une période active existe déjà. Chargez-la avant de créer une nouvelle période.');
       return;
     }
     const cleanRows = rows.filter(r => r.proprietaire_id);
-    if (activeGroup && !activeGroup.date_fin && activeGroup.date_debut === dateDebut) {
+    if (!isEditing && activeGroup && !activeGroup.date_fin && activeGroup.date_debut === dateDebut) {
       if (activeGroup.owners?.length === 1 && cleanRows.length === 1 && activeGroup.owners[0].proprietaire_id !== Number(cleanRows[0].proprietaire_id)) {
         setSubmitError('Ajoutez le nouveau propriétaire puis répartissez les parts (ex: 1/2 et 1/2).');
         return;
       }
     }
+
+    // Check for mandate overlaps if creating a new period
+    if (!isEditing) {
+       const overlappingMandat = mandats.find(m => {
+          if (m.statut === 'annule') return false;
+          const mStart = m.date_debut;
+          const mEnd = m.date_fin;
+          const nStart = dateDebut;
+          const nEnd = dateFin;
+          
+          // Check overlap: (StartA <= EndB) and (EndA >= StartB)
+          // Treat null as infinity
+          const startOverlap = !mEnd || mEnd >= nStart;
+          const endOverlap = !nEnd || nEnd >= mStart;
+          
+          return startOverlap && endOverlap;
+       });
+
+       if (overlappingMandat) {
+          setSubmitError(`Conflit: Le mandat #${overlappingMandat.id} (${overlappingMandat.date_debut} au ${overlappingMandat.date_fin || 'Indéfini'}) couvre déjà cette période. Veuillez le clôturer ou modifier les dates.`);
+          return;
+       }
+    }
+
     const payload = {
       unite_id: Number(uniteId),
       date_debut: dateDebut,
@@ -122,15 +158,62 @@ export default function UniteOwners() {
       generate_documents: false
     };
     try {
-      await saveGroup({ uniteId, payload }).unwrap();
-      setShowManualWizard(true);
+      // Logic for mandate update / avenant creation
+      // We look for a mandate that overlaps with the period [dateDebut, dateFin]
+      // This handles both "Editing" (finding the mandate we are editing) and "New" (checking if we should attach to existing)
+      
+      const matchingMandat = mandats.find(m => {
+          if (m.statut === 'annule') return false;
+          const mStart = m.date_debut;
+          const mEnd = m.date_fin || '9999-12-31';
+          const pStart = dateDebut;
+          const pEnd = dateFin || '9999-12-31';
+          // Overlap if (StartA <= EndB) and (EndA >= StartB)
+          return (mEnd >= pStart && pEnd >= mStart);
+      });
+
+      if (matchingMandat) {
+          if (['actif', 'signe'].includes(matchingMandat.statut)) {
+            // Mandat validated -> Create Avenant -> Wizard
+            setPendingPayload(payload);
+            setWizardMode('avenant');
+            setActiveMandatId(matchingMandat.id);
+            setShowManualWizard(true);
+          } else {
+            // Mandat draft/validation -> Update Mandat directly
+            // Save group immediately
+            await saveGroup({ uniteId, payload }).unwrap();
+            
+            const updatePayload = {
+              date_debut: dateDebut,
+              date_fin: dateFin || matchingMandat.date_fin,
+            };
+            if (cleanRows.length === 1) {
+              updatePayload.proprietaire_id = Number(cleanRows[0].proprietaire_id);
+            }
+            await updateMandat({ id: matchingMandat.id, payload: updatePayload }).unwrap();
+            refetch();
+          }
+      } else {
+        // New period -> Create Mandat -> Wizard
+        setPendingPayload(payload);
+        setWizardMode('mandat');
+        setShowManualWizard(true);
+      }
     } catch (err) {
       setSubmitError(err?.data?.message || err?.message || 'Erreur inconnue');
     }
   };
 
+  const handleBeforeSaveMandate = async () => {
+    if (!pendingPayload) return;
+    await saveGroup({ uniteId, payload: pendingPayload }).unwrap();
+    refetch();
+  };
+
   const loadActive = () => {
     if (!activeGroup) return;
+    setIsEditingActive(true);
     const newRows = (activeGroup.owners || []).map(o => ({
       proprietaire_id: o.proprietaire_id,
       part_numerateur: o.part_numerateur,
@@ -140,6 +223,17 @@ export default function UniteOwners() {
     setDateDebut(activeGroup.date_debut);
     setDateFin(activeGroup.date_fin || '');
   };
+
+  const ownersForWizard = useMemo(() => {
+    return rows.filter(r => r.proprietaire_id).map(r => {
+      const p = ownersById[r.proprietaire_id];
+      return {
+        id: r.proprietaire_id,
+        nom: p?.nom_raison || p?.email || `#${r.proprietaire_id}`,
+        parts: `${r.part_numerateur}/${r.part_denominateur}`
+      };
+    });
+  }, [rows, ownersById]);
 
   if (!canView) {
     return <div className="p-6 text-center text-slate-500">Vous n'avez pas la permission de voir les propriétaires.</div>;
@@ -225,7 +319,9 @@ export default function UniteOwners() {
           {activeGroup && (
             <div className="text-sm bg-blue-50 text-blue-700 rounded-md p-3 flex flex-col gap-1">
               <span>Période active depuis le {activeGroup.date_debut}</span>
-              <Button variant="outline" size="sm" onClick={loadActive} className="w-fit">Charger la période active</Button>
+              <Button variant="default" size="sm" onClick={loadActive} className="w-fit gap-2 bg-blue-600 hover:bg-blue-700">
+                <i className="bi bi-pencil"></i> Modifier la période active
+              </Button>
             </div>
           )}
           <form onSubmit={onSubmit} className="space-y-6">
@@ -235,8 +331,8 @@ export default function UniteOwners() {
                 <Input type="date" value={dateDebut} onChange={(e)=>setDateDebut(e.target.value)} required />
               </div>
               <div>
-                <label className="text-sm font-medium">Date fin</label>
-                <Input type="date" value={dateFin} onChange={(e)=>setDateFin(e.target.value)} />
+                <label className="text-sm font-medium">Date fin *</label>
+                <Input type="date" value={dateFin} onChange={(e)=>setDateFin(e.target.value)} required />
               </div>
             </div>
             <div className="border rounded-md">
@@ -319,7 +415,7 @@ export default function UniteOwners() {
               )}
               <Button type="button" variant="outline" onClick={()=>{
                 setRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
-                setDateDebut(''); setDateFin(''); setSubmitError(null);
+                setDateDebut(''); setDateFin(''); setSubmitError(null); setIsEditingActive(false);
               }}>Réinitialiser</Button>
             </div>
           </form>
@@ -332,25 +428,33 @@ export default function UniteOwners() {
         onClose={() => {
           setShowModal(false); setModalItems([]);
           setRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
-          setDateDebut(''); setDateFin(''); refetch();
+          setDateDebut(''); setDateFin(''); setIsEditingActive(false); refetch();
         }}
         onGotoMandats={() => navigate('/mandats')}
         onGotoAvenants={() => navigate('/avenants')}
       />
       <ManualDocsWizard
         open={showManualWizard}
-        onClose={() => {
+        onClose={(isSuccess) => {
           setShowManualWizard(false);
-          setRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
-          setDateDebut(''); setDateFin(''); refetch();
+          if (isSuccess) {
+            setRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
+            setDateDebut(''); setDateFin(''); setIsEditingActive(false); refetch();
+            setPendingPayload(null);
+          }
         }}
         proprietaires={proprietaires}
         defaultProprietaireId={rows[0]?.proprietaire_id || ''}
         defaultDateDebut={dateDebut}
         defaultDateFin={dateFin}
         uniteDescription={undefined}
-        allowAvenant={true}
+        allowAvenant={false}
+        initialMode={wizardMode}
+        defaultMandatId={activeMandatId}
         lockCoreFields={true}
+        unitOwners={ownersForWizard}
+        uniteId={uniteId}
+        onBeforeSave={handleBeforeSaveMandate}
       />
     </div>
   );

@@ -22,7 +22,7 @@ class UniteController extends Controller
 
     public function index(Request $request)
     {
-        $q = Unite::query();
+        $q = Unite::query()->with('proprietaires');
         
         // Appliquer le filtrage par statut selon les permissions
         $q = $this->applyStatusPermissions($q, 'unites');
@@ -162,7 +162,7 @@ class UniteController extends Controller
         // Pour le commercial: seul le numero_unite est requis, tous les autres champs sont optionnels
         $rules = [
             'numero_unite' => ['required', 'string', 'max:50'], // Toujours requis
-            'type_unite' => ['nullable', 'in:appartement,maison,bureau,local_commercial,garage,box,terrain,autre'],
+            'type_unite' => ['nullable', 'string', 'max:100'],
             'adresse_complete' => ['nullable', 'string', 'max:255'],
             'immeuble' => ['nullable', 'string', 'max:150'],
             'bloc' => ['nullable', 'string', 'max:50'],

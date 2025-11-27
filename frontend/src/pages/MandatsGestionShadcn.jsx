@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useGetMandatsQuery } from '../api/baseApi';
-import { useGetProprietairesQuery } from '../features/proprietaires/proprietairesApi';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import Select from 'react-select';
-import { FileText, Plus, Search, Filter, RefreshCw, User, Eye, Edit, ArrowUpDown } from 'lucide-react';
+import { FileText, Plus, Search, Filter, RefreshCw, User, Eye, Edit, ArrowUpDown, Building } from 'lucide-react';
 
 export default function MandatsGestionShadcn() {
   const [q, setQ] = useState('');
-  const [proprietaireId, setProprietaireId] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   
@@ -22,13 +19,10 @@ export default function MandatsGestionShadcn() {
     sort_dir: sortDir,
   };
   if (q) queryParams.q = q;
-  if (proprietaireId && proprietaireId !== 'all') queryParams.proprietaire_id = proprietaireId;
   
   const { data, isFetching, refetch } = useGetMandatsQuery(queryParams);
-  const { data: proprietairesData } = useGetProprietairesQuery({ per_page: 1000 });
   
   const rows = data?.data || data || [];
-  const proprietaires = proprietairesData?.data || [];
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -38,34 +32,6 @@ export default function MandatsGestionShadcn() {
       setSortDir('asc');
     }
   };
-
-  const customSelectStyles = {
-    control: (provided, state) => ({
-      ...provided,
-      borderRadius: '0.375rem',
-      borderColor: state.isFocused ? 'hsl(var(--ring))' : 'hsl(var(--input))',
-      boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--ring))' : 'none',
-      '&:hover': { borderColor: 'hsl(var(--ring))' },
-      minHeight: '2.5rem',
-      fontSize: '0.875rem',
-    }),
-    menu: (provided) => ({
-      ...provided,
-      borderRadius: '0.375rem',
-      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-      border: '1px solid hsl(var(--border))',
-      zIndex: 50,
-    }),
-    option: (provided, state) => ({
-      ...provided,
-      backgroundColor: state.isSelected ? 'hsl(var(--primary))' : state.isFocused ? 'hsl(var(--accent))' : 'transparent',
-      color: state.isSelected ? 'hsl(var(--primary-foreground))' : state.isFocused ? 'hsl(var(--accent-foreground))' : 'inherit',
-      cursor: 'pointer',
-      fontSize: '0.875rem',
-    }),
-  };
-
-  const proprietaireOptions = proprietaires.map(p => ({ value: String(p.id), label: p.nom_raison || p.email || `#${p.id}` }));
 
   const getStatusBadge = (statut) => {
     const map = {
@@ -119,24 +85,10 @@ export default function MandatsGestionShadcn() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Propriétaire</Label>
-              <Select
-                styles={customSelectStyles}
-                options={proprietaireOptions}
-                value={proprietaireId !== 'all' ? proprietaireOptions.find(o => o.value === proprietaireId) : null}
-                onChange={(opt) => setProprietaireId(opt ? opt.value : 'all')}
-                isClearable
-                isSearchable
-                placeholder="Tous les propriétaires"
-                noOptionsMessage={() => 'Aucun propriétaire'}
-                loadingMessage={() => 'Chargement...'}
-              />
-            </div>
             <div className="flex items-end">
               <Button 
                 variant="outline" 
-                onClick={() => { setQ(''); setProprietaireId('all'); refetch(); }}
+                onClick={() => { setQ(''); refetch(); }}
                 className="w-full md:w-auto"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -155,7 +107,7 @@ export default function MandatsGestionShadcn() {
                 <TableHead className="cursor-pointer" onClick={() => handleSort('reference')}>
                   Référence {sortBy === 'reference' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
-                <TableHead>Propriétaire</TableHead>
+                <TableHead>Unité</TableHead>
                 <TableHead className="cursor-pointer" onClick={() => handleSort('date_debut')}>
                   Date Début {sortBy === 'date_debut' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                 </TableHead>
@@ -186,14 +138,15 @@ export default function MandatsGestionShadcn() {
                   <TableRow key={mandat.id}>
                     <TableCell className="font-medium">{mandat.reference || `#${mandat.id}`}</TableCell>
                     <TableCell>
-                      {mandat.proprietaire ? (
+                      {mandat.unite ? (
                         <div className="flex items-center gap-2">
                           <div className="bg-slate-100 rounded-full p-1">
-                            <User className="h-3 w-3 text-slate-500" />
+                            <Building className="h-3 w-3 text-slate-500" />
                           </div>
-                          <span className="text-sm">
-                            {mandat.proprietaire.nom_raison || mandat.proprietaire.email}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{mandat.unite.numero_unite}</span>
+                            <span className="text-xs text-muted-foreground">{mandat.unite.immeuble}</span>
+                          </div>
                         </div>
                       ) : '-'}
                     </TableCell>

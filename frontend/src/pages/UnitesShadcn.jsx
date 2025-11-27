@@ -53,7 +53,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
-import { Search, Plus, Edit, Trash2, Home, MapPin, Maximize2, Users, Map as MapIcon, Locate, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Home, MapPin, Maximize2, Users, Map as MapIcon, Locate, ArrowUpDown, CheckCircle2, XCircle } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -123,6 +123,8 @@ export default function UnitesShadcn() {
   const [mapSearchQuery, setMapSearchQuery] = useState('');
   const [isSearchingMap, setIsSearchingMap] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showMandatModal, setShowMandatModal] = useState(false);
+  const [createdUniteId, setCreatedUniteId] = useState(null);
   const [selectedUnite, setSelectedUnite] = useState(null);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
@@ -141,6 +143,7 @@ export default function UnitesShadcn() {
     mobilier: '',
     statut: 'vacant',
   });
+  const [isCustomType, setIsCustomType] = useState(false);
 
   const [ownersRows, setOwnersRows] = useState([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
 
@@ -185,6 +188,17 @@ export default function UnitesShadcn() {
   }), [pagination, searchTerm, selectedStatut, selectedType, selectedImmeuble, sortBy, sortDir]);
 
   const { data, isLoading, isFetching, refetch } = useGetUnitesQuery(queryParams);
+  const { data: allUnitesData } = useGetUnitesQuery({ per_page: 1000 });
+  const allUnites = allUnitesData?.data || [];
+
+  const distinctTypes = useMemo(() => {
+    const types = new Set(['Appartement', 'Bureau', 'Local commercial', 'Garage', 'Autre']);
+    allUnites.forEach(u => {
+        if (u.type_unite) types.add(u.type_unite);
+    });
+    return Array.from(types).sort();
+  }, [allUnites]);
+
   const { data: immeublesData } = useGetImmeublesQuery();
   const immeubles = immeublesData || [];
   const [createUnite, { isLoading: isCreating }] = useCreateUniteMutation();
@@ -258,10 +272,11 @@ export default function UnitesShadcn() {
   const handleAdd = () => {
     setSelectedUnite(null);
     setErrors({});
+    setIsCustomType(false);
     setOwnersRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
     setFormData({
       numero_unite: '',
-      type_unite: 'appartement',
+      type_unite: 'Appartement',
       adresse_complete: '',
       coordonnees_gps: '',
       immeuble: '',
@@ -283,9 +298,11 @@ export default function UnitesShadcn() {
   const handleEdit = (unite) => {
     setSelectedUnite(unite);
     setErrors({});
+    const type = unite.type_unite || 'Appartement';
+    setIsCustomType(!distinctTypes.includes(type));
     setFormData({
       numero_unite: unite.numero_unite || '',
-      type_unite: unite.type_unite || 'appartement',
+      type_unite: type,
       adresse_complete: unite.adresse_complete || '',
       coordonnees_gps: unite.coordonnees_gps || '',
       immeuble: unite.immeuble || '',
@@ -339,8 +356,12 @@ export default function UnitesShadcn() {
         await updateUnite({ id: selectedUnite.id, ...payload }).unwrap();
         toast({ title: "Succès", description: "Unité mise à jour avec succès" });
       } else {
-        await createUnite(payload).unwrap();
+        const newUnite = await createUnite(payload).unwrap();
         toast({ title: "Succès", description: "Unité créée avec succès" });
+        setCreatedUniteId(newUnite.id); // Set the created unite ID
+        if (payload.owners && payload.owners.length > 0) {
+          setShowMandatModal(true);
+        }
       }
       setShowFormModal(false);
     } catch (error) {
@@ -518,19 +539,20 @@ export default function UnitesShadcn() {
                       <ArrowUpDown className={`ml-2 h-4 w-4 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
                     )}
                   </TableHead>
+                  <TableHead className="text-center">Lié</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       Chargement...
                     </TableCell>
                   </TableRow>
                 ) : data?.data?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Aucune unité trouvée
                     </TableCell>
                   </TableRow>
@@ -548,6 +570,13 @@ export default function UnitesShadcn() {
                       </TableCell>
                       <TableCell>
                         {getStatutBadge(unite.statut)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {unite.proprietaires && unite.proprietaires.length > 0 ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -628,20 +657,35 @@ export default function UnitesShadcn() {
               <div>
                 <Label htmlFor="type_unite" className={errors.type_unite ? "text-destructive" : ""}>Type d'unité</Label>
                 <Select
-                  value={formData.type_unite}
-                  onValueChange={(value) => setFormData({ ...formData, type_unite: value })}
+                  value={isCustomType ? '__custom__' : formData.type_unite}
+                  onValueChange={(value) => {
+                    if (value === '__custom__') {
+                        setIsCustomType(true);
+                        setFormData({ ...formData, type_unite: '' });
+                    } else {
+                        setIsCustomType(false);
+                        setFormData({ ...formData, type_unite: value });
+                    }
+                  }}
                 >
                   <SelectTrigger id="type_unite" className={errors.type_unite ? "border-destructive" : ""}>
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Appartement">Appartement</SelectItem>
-                    <SelectItem value="Bureau">Bureau</SelectItem>
-                    <SelectItem value="Magasin">Magasin</SelectItem>
-                    <SelectItem value="Villa">Villa</SelectItem>
-                    <SelectItem value="Terrain">Terrain</SelectItem>
+                    {distinctTypes.map(t => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                    <SelectItem value="__custom__">➕ Autre (Nouveau type)</SelectItem>
                   </SelectContent>
                 </Select>
+                {isCustomType && (
+                    <Input
+                        placeholder="Saisir le nouveau type..."
+                        value={formData.type_unite}
+                        onChange={(e) => setFormData({ ...formData, type_unite: e.target.value })}
+                        className={`mt-2 ${errors.type_unite ? "border-destructive" : ""}`}
+                    />
+                )}
                 {errors.type_unite && <p className="text-xs text-destructive mt-1">{errors.type_unite[0]}</p>}
               </div>
               <div className="md:col-span-2">
@@ -722,9 +766,6 @@ export default function UnitesShadcn() {
                 <div>
                   <Label htmlFor="nb_sdb" className={errors.nb_sdb ? "text-destructive" : ""}>Nb SDB</Label>
                   <Input
-                    id="nb_sdb"
-                    type="number"
-                    value={formData.nb_sdb}
                     onChange={(e) => setFormData({ ...formData, nb_sdb: e.target.value })}
                     className={errors.nb_sdb ? "border-destructive" : ""}
                   />
@@ -923,6 +964,31 @@ export default function UnitesShadcn() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Mandat Creation Prompt Dialog */}
+      <AlertDialog open={showMandatModal} onOpenChange={setShowMandatModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Créer un mandat de gestion ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous avez associé des propriétaires à cette unité. Voulez-vous créer un mandat de gestion maintenant ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowMandatModal(false)}>Plus tard</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+                setShowMandatModal(false);
+                navigate('/mandats/nouveau', { 
+                    state: { 
+                        uniteId: createdUniteId
+                    } 
+                });
+            }}>
+              Créer le mandat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

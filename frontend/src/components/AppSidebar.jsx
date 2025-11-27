@@ -38,6 +38,7 @@ import {
   FileCheck,
   Receipt,
   CreditCard,
+  BookOpen,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -141,6 +142,7 @@ export default function AppSidebar() {
         { title: 'Unités', url: '/unites', icon: Building2, permission: PERMS.unites.view },
         { title: 'Employés', url: '/employes', icon: Users, permission: PERMS.users.view },
         { title: 'Rôles & Permissions', url: '/roles-permissions', icon: Settings, permission: PERMS.roles.view },
+        { title: 'Guide', url: '/guide', icon: BookOpen },
       ],
     },
   ];

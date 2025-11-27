@@ -25,7 +25,7 @@ class MandatGestionController extends Controller
 
     public function index(Request $request)
     {
-        $query = MandatGestion::query()->with(['proprietaire']);
+        $query = MandatGestion::query()->with(['unite']);
 
         $this->applyStatusPermissions($query, 'mandats');
 
@@ -36,8 +36,8 @@ class MandatGestionController extends Controller
             });
         }
 
-        if ($proprietaireId = $request->query('proprietaire_id')) {
-            $query->where('proprietaire_id', $proprietaireId);
+        if ($uniteId = $request->query('unite_id')) {
+            $query->where('unite_id', $uniteId);
         }
 
         if ($statut = $request->query('statut')) {
@@ -74,20 +74,20 @@ class MandatGestionController extends Controller
         // Always set the creator from the authenticated user
         $data['created_by'] = $request->user()->id;
         $mandat = MandatGestion::create($data);
-        return response()->json($mandat->load('proprietaire'), 201);
+        return response()->json($mandat->load(['unite']), 201);
     }
 
     public function show(MandatGestion $mandats_gestion)
     {
         // Route model binding will inject the record when using apiResource with parameter name
-        return response()->json($mandats_gestion->load('proprietaire'));
+        return response()->json($mandats_gestion->load(['unite']));
     }
 
     public function update(Request $request, MandatGestion $mandats_gestion)
     {
         $data = $this->validatedData($request, false, $mandats_gestion->id);
         $mandats_gestion->update($data);
-        return response()->json($mandats_gestion->load('proprietaire'));
+        return response()->json($mandats_gestion->load(['unite']));
     }
 
     public function destroy(MandatGestion $mandats_gestion)
@@ -100,7 +100,7 @@ class MandatGestionController extends Controller
     {
         $this->middleware('permission:mandats.view');
         
-        $mandat = $mandats_gestion->load('proprietaire');
+        $mandat = $mandats_gestion->load(['unite.proprietaires']);
         
         // Create PhpWord document
         $phpWord = new PhpWord();
@@ -141,38 +141,46 @@ class MandatGestionController extends Controller
         $section->addText('I. IDENTIFICATION DU PROPRIÉTAIRE', 'headerStyle');
         $section->addTextBreak(1);
         
-        $proprietaire = $mandat->proprietaire;
-        $isSociete = !empty($proprietaire->rc) || !empty($proprietaire->ice) || $proprietaire->type_proprietaire === 'societe';
-        
-        if ($isSociete) {
-            $section->addText('Raison sociale : ' . ($proprietaire->nom_raison ?: ''), 'normalStyle');
-            if ($proprietaire->rc) {
-                $section->addText('RC : ' . $proprietaire->rc, 'normalStyle');
+        $proprietaire = null;
+        if ($mandat->unite && $mandat->unite->proprietaires->isNotEmpty()) {
+            $proprietaire = $mandat->unite->proprietaires->first();
+        }
+
+        if ($proprietaire) {
+            $isSociete = !empty($proprietaire->rc) || !empty($proprietaire->ice) || $proprietaire->type_proprietaire === 'societe';
+            
+            if ($isSociete) {
+                $section->addText('Raison sociale : ' . ($proprietaire->nom_raison ?: ''), 'normalStyle');
+                if ($proprietaire->rc) {
+                    $section->addText('RC : ' . $proprietaire->rc, 'normalStyle');
+                }
+                if ($proprietaire->ice) {
+                    $section->addText('ICE : ' . $proprietaire->ice, 'normalStyle');
+                }
+                if ($proprietaire->ifiscale) {
+                    $section->addText('IF : ' . $proprietaire->ifiscale, 'normalStyle');
+                }
+            } else {
+                $section->addText('Nom complet : ' . ($proprietaire->nom_raison ?: ''), 'normalStyle');
+                if ($proprietaire->cin) {
+                    $section->addText('CIN : ' . $proprietaire->cin, 'normalStyle');
+                }
             }
-            if ($proprietaire->ice) {
-                $section->addText('ICE : ' . $proprietaire->ice, 'normalStyle');
+            
+            if ($proprietaire->adresse_complete) {
+                $section->addText('Adresse : ' . $proprietaire->adresse_complete, 'normalStyle');
             }
-            if ($proprietaire->ifiscale) {
-                $section->addText('IF : ' . $proprietaire->ifiscale, 'normalStyle');
+            if ($proprietaire->ville) {
+                $section->addText('Ville : ' . $proprietaire->ville, 'normalStyle');
+            }
+            if ($proprietaire->telephone) {
+                $section->addText('Téléphone : ' . $proprietaire->telephone, 'normalStyle');
+            }
+            if ($proprietaire->email) {
+                $section->addText('Email : ' . $proprietaire->email, 'normalStyle');
             }
         } else {
-            $section->addText('Nom complet : ' . ($proprietaire->nom_raison ?: ''), 'normalStyle');
-            if ($proprietaire->cin) {
-                $section->addText('CIN : ' . $proprietaire->cin, 'normalStyle');
-            }
-        }
-        
-        if ($proprietaire->adresse_complete) {
-            $section->addText('Adresse : ' . $proprietaire->adresse_complete, 'normalStyle');
-        }
-        if ($proprietaire->ville) {
-            $section->addText('Ville : ' . $proprietaire->ville, 'normalStyle');
-        }
-        if ($proprietaire->telephone) {
-            $section->addText('Téléphone : ' . $proprietaire->telephone, 'normalStyle');
-        }
-        if ($proprietaire->email) {
-            $section->addText('Email : ' . $proprietaire->email, 'normalStyle');
+            $section->addText('Aucun propriétaire identifié.', 'normalStyle');
         }
         
         $section->addTextBreak(1);
@@ -269,7 +277,7 @@ class MandatGestionController extends Controller
         $cell1 = $table->addCell(5000);
         $cell1->addText('Le Propriétaire', 'boldStyle');
         $cell1->addTextBreak(3);
-        $cell1->addText($proprietaire->nom_raison ?: '', 'normalStyle');
+        $cell1->addText($proprietaire ? ($proprietaire->nom_raison ?: '') : '', 'normalStyle');
         
         $cell2 = $table->addCell(5000);
         $cell2->addText('Le Gestionnaire', 'boldStyle');
@@ -305,7 +313,7 @@ class MandatGestionController extends Controller
         }
 
         return $request->validate([
-            'proprietaire_id'    => ['required', 'exists:proprietaires,id'],
+            'unite_id'           => ['required', 'exists:unites,id'],
             'reference'          => ['nullable', 'string', 'max:80', $uniqueRef],
             'date_debut'         => ['required', 'date'],
             'date_fin'           => ['nullable', 'date', 'after_or_equal:date_debut'],

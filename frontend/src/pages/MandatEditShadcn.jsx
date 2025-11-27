@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useGetMandatQuery, useUpdateMandatMutation, useCreateMandatMutation } from '../api/baseApi';
-import { useGetProprietairesQuery } from '../features/proprietaires/proprietairesApi';
+import { useGetMandatQuery, useUpdateMandatMutation, useCreateMandatMutation, useGetUnitesQuery } from '../api/baseApi';
 import { PERMS } from '../utils/permissionKeys';
 import useAuthz from '../hooks/useAuthz';
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
 import { FileText, Save, ArrowLeft, Download, RefreshCw } from 'lucide-react';
 
 // Helper to format date from backend to YYYY-MM-DD
@@ -27,10 +27,12 @@ export default function MandatEditShadcn() {
   const navigate = useNavigate();
   const location = useLocation();
   const { can } = useAuthz();
+  const { toast } = useToast();
   const mandatState = location.state?.mandat;
+  const uniteIdFromState = location.state?.uniteId;
   const { data, isFetching } = useGetMandatQuery(id, { skip: isNew || !!mandatState });
-  const { data: proprietairesData } = useGetProprietairesQuery({ per_page: 1000 });
-  const proprietaires = proprietairesData?.data || [];
+  const { data: unitesData } = useGetUnitesQuery({ per_page: 1000 });
+  const unites = unitesData?.data || [];
   const [updateMandat, { isLoading: isUpdating }] = useUpdateMandatMutation();
   const [createMandat, { isLoading: isCreating }] = useCreateMandatMutation();
   const [form, setForm] = useState(null);
@@ -38,7 +40,7 @@ export default function MandatEditShadcn() {
   useEffect(() => {
     if (isNew && !form) {
       setForm({
-        proprietaire_id: '',
+        unite_id: uniteIdFromState || '',
         reference: '',
         date_debut: '',
         date_fin: '',
@@ -65,7 +67,7 @@ export default function MandatEditShadcn() {
     const source = mandatState || data;
     if (source && !form) {
       setForm({
-        proprietaire_id: source.proprietaire_id,
+        unite_id: source.unite_id || '',
         reference: source.reference || '',
         date_debut: formatDateForInput(source.date_debut),
         date_fin: formatDateForInput(source.date_fin),
@@ -101,6 +103,12 @@ export default function MandatEditShadcn() {
 
   const onSave = async (e) => {
     e.preventDefault();
+    
+    if (!form.unite_id) {
+      toast({ variant: "destructive", title: "Erreur", description: "Veuillez sélectionner une unité." });
+      return;
+    }
+
     try {
       const payload = {
         ...form,
@@ -111,13 +119,16 @@ export default function MandatEditShadcn() {
       
       if (isNew) {
         await createMandat(payload).unwrap();
+        toast({ title: "Succès", description: "Mandat créé avec succès." });
       } else {
         await updateMandat({ id, payload }).unwrap();
+        toast({ title: "Succès", description: "Mandat mis à jour avec succès." });
       }
       navigate('/mandats');
     } catch (err) {
       console.error(err);
-      alert(isNew ? 'Erreur de création du mandat' : 'Erreur de mise à jour du mandat');
+      const msg = err?.data?.message || (isNew ? 'Erreur de création du mandat' : 'Erreur de mise à jour du mandat');
+      toast({ variant: "destructive", title: "Erreur", description: msg });
     }
   };
 
@@ -184,19 +195,19 @@ export default function MandatEditShadcn() {
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Propriétaire</Label>
+                  <Label>Unité</Label>
                   <Select 
-                    value={form.proprietaire_id ? String(form.proprietaire_id) : ''} 
-                    onValueChange={v => onChange('proprietaire_id', v)}
-                    disabled={!isNew} // Usually we don't change owner of a mandate
+                    value={form.unite_id ? String(form.unite_id) : ''} 
+                    onValueChange={v => onChange('unite_id', v)}
+                    disabled={!isNew}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un propriétaire" />
+                      <SelectValue placeholder="Sélectionner une unité" />
                     </SelectTrigger>
                     <SelectContent>
-                      {proprietaires.map(p => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.nom_raison || p.email || `#${p.id}`}
+                      {unites.map(u => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.numero_unite} - {u.immeuble}
                         </SelectItem>
                       ))}
                     </SelectContent>

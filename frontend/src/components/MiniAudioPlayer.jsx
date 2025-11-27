@@ -64,14 +64,14 @@ export function MiniAudioPlayer({ src }) {
   };
 
   return (
-    <div className="flex items-center gap-3 bg-white rounded-full px-3 py-1.5 w-fit border shadow-sm hover:shadow transition-all group">
+    <div className="flex items-center gap-3 bg-white rounded-full px-3 py-1.5 w-full border shadow-sm hover:shadow transition-all group">
       <audio ref={audioRef} src={src} preload="metadata" />
       
       <button
         type="button"
         onClick={togglePlay}
         className={`
-            flex items-center justify-center h-8 w-8 rounded-full transition-all
+            flex items-center justify-center h-8 w-8 rounded-full transition-all shrink-0
             ${isPlaying 
                 ? 'bg-primary text-primary-foreground shadow-md scale-105' 
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -85,13 +85,13 @@ export function MiniAudioPlayer({ src }) {
         )}
       </button>
       
-      <div className="h-1.5 w-48 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+      <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
         <div 
           className="h-full bg-primary transition-all duration-100 ease-linear rounded-full"
           style={{ width: `${progress}%` }}
         />
       </div>
-      <span className="text-[10px] text-muted-foreground font-medium min-w-[35px] text-right tabular-nums">
+      <span className="text-[10px] text-muted-foreground font-medium min-w-[35px] text-right tabular-nums shrink-0">
           {isPlaying ? formatTime(audioRef.current?.currentTime) : formatTime(duration)}
       </span>
     </div>

@@ -21,9 +21,9 @@ class UniteProprietaireController extends Controller
         $this->middleware('permission:unites.ownership.manage')->only(['store']);
     }
 
-    private function findLatestMandatIdFor(int $proprietaireId): ?int
+    private function findLatestMandatIdFor(int $uniteId): ?int
     {
-        $mandat = MandatGestion::where('proprietaire_id', $proprietaireId)
+        $mandat = MandatGestion::where('unite_id', $uniteId)
             ->latest('id')
             ->first();
         return $mandat?->id;
@@ -102,80 +102,87 @@ class UniteProprietaireController extends Controller
                 $createAvenant = $request->has('create_avenant') ? $request->boolean('create_avenant') : true; // default true
                 $includeAllOwnerNames = $request->boolean('include_all_owner_names');
 
-                foreach ($ownershipRows as $row) {
-                    $prop = Proprietaire::find($row->proprietaire_id);
-                    if (!$prop) { continue; }
-
-                    // Create Mandat de gestion (brouillon)
-                    $mandat = null;
-                    // Optional permission check if Spatie permissions are in use
-                    if (method_exists($user, 'can') ? $user->can('mandats.create') : true) {
-                        $pouvoirsText = $tpl->getMandatTemplateByType($reqType, $prop);
-                        // Append all owner names if requested and template is person (or auto resolved to person)
-                        if ($includeAllOwnerNames) {
-                            $personTemplateUsed = ($reqType === 'personne') || ($reqType === 'auto' && !$prop->rc && !$prop->ice && !$prop->ifiscale && $prop->type_proprietaire !== 'societe');
-                            if ($personTemplateUsed) {
-                                $allNames = collect($data['owners'])
-                                    ->map(fn($o) => Proprietaire::find($o['proprietaire_id']))
-                                    ->filter()
-                                    ->map(fn($p) => $p->nom_raison ?? ($p->nom_ar ?: $p->email))
-                                    ->unique()
-                                    ->values();
-                                if ($allNames->count() > 1) {
+                // We create ONE mandat for the unit, using the first owner as the primary contact for template purposes
+                if (!empty($ownershipRows)) {
+                    $firstOwnerRow = $ownershipRows[0];
+                    $prop = Proprietaire::find($firstOwnerRow->proprietaire_id);
+                    
+                    if ($prop) {
+                        // Create Mandat de gestion (brouillon)
+                        $mandat = null;
+                        // Optional permission check if Spatie permissions are in use
+                        if (method_exists($user, 'can') ? $user->can('mandats.create') : true) {
+                            $pouvoirsText = $tpl->getMandatTemplateByType($reqType, $prop);
+                            
+                            // Append all owner names if requested
+                            // We list ALL owners in the mandat text
+                            $allNames = collect($data['owners'])
+                                ->map(fn($o) => Proprietaire::find($o['proprietaire_id']))
+                                ->filter()
+                                ->map(fn($p) => $p->nom_raison ?? ($p->nom_ar ?: $p->email))
+                                ->unique()
+                                ->values();
+                                
+                            if ($includeAllOwnerNames) {
+                                $personTemplateUsed = ($reqType === 'personne') || ($reqType === 'auto' && !$prop->rc && !$prop->ice && !$prop->ifiscale && $prop->type_proprietaire !== 'societe');
+                                if ($personTemplateUsed && $allNames->count() > 1) {
                                     $namesLine = ($reqLangue === 'fr')
                                         ? "Co-propriétaires: " . $allNames->join(', ') . "\n"
                                         : (($reqLangue === 'ar' || $reqLangue === 'ar_fr') ? "الملاك المشتركون: " . $allNames->join('، ') . "\n" : "");
                                     $pouvoirsText = $namesLine . $pouvoirsText;
                                 }
                             }
+                            
+                            $descBien = $tpl->buildUniteDescription($unite);
+                            
+                            $mandat = MandatGestion::create([
+                                'unite_id' => $unite->id,
+                                'reference' => null,
+                                'date_debut' => $dateDebut,
+                                'date_fin' => $dateFin,
+                                'taux_gestion_pct' => $prop->taux_gestion_tgi_pct,
+                                'assiette_honoraires' => 'loyers_encaisse',
+                                'tva_applicable' => false,
+                                'tva_taux' => null,
+                                'frais_min_mensuel' => null,
+                                'periodicite_releve' => 'trimestriel',
+                                'charge_maintenance' => null,
+                                'mode_versement' => null,
+                                'description_bien' => $descBien,
+                                'usage_bien' => null,
+                                'pouvoirs_accordes' => $pouvoirsText,
+                                'lieu_signature' => 'Tanger',
+                                'date_signature' => null,
+                                'langue' => $reqLangue ?: 'ar',
+                                'notes_clauses' => null,
+                                'statut' => 'brouillon',
+                                'created_by' => $user->id,
+                            ]);
+
+                            // We just return the first owner ID for the response metadata, or maybe 0
+                            $createdDocs[] = ['type' => 'mandat', 'id' => $mandat->id, 'proprietaire_id' => $prop->id];
                         }
-                        $descBien = $tpl->buildUniteDescription($unite);
-                        $mandat = MandatGestion::create([
-                            'proprietaire_id' => $prop->id,
-                            'reference' => null,
-                            'date_debut' => $dateDebut,
-                            'date_fin' => $dateFin,
-                            'taux_gestion_pct' => $prop->taux_gestion_tgi_pct,
-                            'assiette_honoraires' => 'loyers_encaisse',
-                            'tva_applicable' => false,
-                            'tva_taux' => null,
-                            'frais_min_mensuel' => null,
-                            'periodicite_releve' => 'trimestriel',
-                            'charge_maintenance' => null,
-                            'mode_versement' => null,
-                            'description_bien' => $descBien,
-                            'usage_bien' => null,
-                            'pouvoirs_accordes' => $pouvoirsText,
-                            'lieu_signature' => 'Tanger',
-                            'date_signature' => null,
-                            'langue' => $reqLangue ?: 'ar',
-                            'notes_clauses' => null,
-                            'statut' => 'brouillon',
-                            'created_by' => $user->id,
-                        ]);
 
-                        $createdDocs[] = ['type' => 'mandat', 'id' => $mandat->id, 'proprietaire_id' => $prop->id];
-                    }
-
-                    // Create Avenant au pouvoir (brouillon)
-                    if ($createAvenant && (method_exists($user, 'can') ? $user->can('avenants.create') : true)) {
-                        $avenantText = $tpl->getAvenantTemplate();
-                        $objet = 'Avenant au pouvoir – Unité ' . ($unite->numero_unite ?: ('#'.$unite->id));
-                        $avenant = AvenantMandat::create([
-                            'mandat_id' => $mandat?->id ?? $this->findLatestMandatIdFor($prop->id),
-                            'reference' => null,
-                            'date_pouvoir_initial' => null,
-                            'objet_resume' => $objet,
-                            'modifs_text' => $avenantText,
-                            'date_effet' => $dateDebut,
-                            'lieu_signature' => 'Tanger',
-                            'date_signature' => null,
-                            'rep_b_user_id' => $user->id,
-                            'statut' => 'brouillon',
-                            'fichier_url' => null,
-                            'created_by' => $user->id,
-                        ]);
-                        $createdDocs[] = ['type' => 'avenant', 'id' => $avenant->id, 'proprietaire_id' => $prop->id];
+                        // Create Avenant au pouvoir (brouillon)
+                        if ($createAvenant && (method_exists($user, 'can') ? $user->can('avenants.create') : true)) {
+                            $avenantText = $tpl->getAvenantTemplate();
+                            $objet = 'Avenant au pouvoir – Unité ' . ($unite->numero_unite ?: ('#'.$unite->id));
+                            $avenant = AvenantMandat::create([
+                                'mandat_id' => $mandat?->id ?? $this->findLatestMandatIdFor($unite->id),
+                                'reference' => null,
+                                'date_pouvoir_initial' => null,
+                                'objet_resume' => $objet,
+                                'modifs_text' => $avenantText,
+                                'date_effet' => $dateDebut,
+                                'lieu_signature' => 'Tanger',
+                                'date_signature' => null,
+                                'rep_b_user_id' => $user->id,
+                                'statut' => 'brouillon',
+                                'fichier_url' => null,
+                                'created_by' => $user->id,
+                            ]);
+                            $createdDocs[] = ['type' => 'avenant', 'id' => $avenant->id, 'proprietaire_id' => $prop->id];
+                        }
                     }
                 }
             }

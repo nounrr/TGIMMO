@@ -12,7 +12,7 @@ class MandatGestion extends Model
     protected $table = 'mandats_gestion';
 
     protected $fillable = [
-        'proprietaire_id',
+        'unite_id',
         'reference',
         'date_debut',
         'date_fin',
@@ -47,9 +47,9 @@ class MandatGestion extends Model
         'updated_at' => 'datetime',
     ];
 
-    public function proprietaire()
+    public function unite()
     {
-    return $this->belongsTo(Proprietaire::class);
+        return $this->belongsTo(Unite::class, 'unite_id');
     }
 
     public function creator()
