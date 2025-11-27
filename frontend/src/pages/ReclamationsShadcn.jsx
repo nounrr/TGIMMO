@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Plus, Search, Filter, AlertCircle, CheckCircle, XCircle, Clock, ArrowUpDown } from 'lucide-react';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function ReclamationsShadcn() {
   const { can } = useAuthz();
@@ -20,18 +21,23 @@ export default function ReclamationsShadcn() {
   const [bailId, setBailId] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const params = useMemo(() => ({
+    page,
+    per_page: perPage,
     q: q || undefined,
     status: status !== 'all' ? status : undefined,
     reclamation_type_id: typeId !== 'all' ? typeId : undefined,
     bail_id: bailId !== 'all' ? bailId : undefined,
     sort_by: sortBy,
     order: sortOrder,
-  }), [q, status, typeId, bailId, sortBy, sortOrder]);
+  }), [q, status, typeId, bailId, sortBy, sortOrder, page, perPage]);
 
   const { data: recData, isLoading } = useGetReclamationsQuery(params);
   const list = recData?.data || [];
+  const meta = recData?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
   const { data: types } = useGetReclamationTypesQuery();
   const { data: bauxData } = useGetBauxQuery({ per_page: 1000 });
   const baux = bauxData?.data || [];
@@ -223,6 +229,17 @@ export default function ReclamationsShadcn() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* Pagination */}
+        <PaginationControl
+          currentPage={page}
+          lastPage={meta.last_page}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+        />
       </Card>
     </div>
   );

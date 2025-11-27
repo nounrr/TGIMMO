@@ -63,6 +63,16 @@ export const PERMS = {
     update: 'mandats.update',
     delete: 'mandats.delete',
     download: 'mandats.download',
+    status: {
+      modifier: 'mandats.status.modifier',
+    }
+  },
+  unites_proprietaires: {
+    view: 'unites-proprietaires.view',
+    manage: 'unites-proprietaires.manage',
+    status: {
+      modifier: 'unites-proprietaires.status.modifier',
+    }
   },
   avenants: {
     view: 'avenants.view',

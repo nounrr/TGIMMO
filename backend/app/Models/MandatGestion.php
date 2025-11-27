@@ -61,4 +61,23 @@ class MandatGestion extends Model
     {
         return $this->hasMany(AvenantMandat::class, 'mandat_id');
     }
+
+    // Get proprietaires through unite's ownership records
+    public function proprietaires()
+    {
+        return $this->hasManyThrough(
+            Proprietaire::class,
+            UniteProprietaire::class,
+            'unite_id', // Foreign key on unites_proprietaires table
+            'id', // Foreign key on proprietaires table
+            'unite_id', // Local key on mandats_gestion table
+            'proprietaire_id' // Local key on unites_proprietaires table
+        )->where('unites_proprietaires.mandat_id', $this->id);
+    }
+
+    // Backward compatibility: get first proprietaire
+    public function proprietaire()
+    {
+        return $this->proprietaires()->limit(1);
+    }
 }

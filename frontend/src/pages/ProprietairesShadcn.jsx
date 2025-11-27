@@ -53,6 +53,7 @@ import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, CreditCard, TrendingUp
 
 import { useSelector } from 'react-redux';
 import { useMeQuery } from '../features/auth/authApi';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function ProprietairesShadcn() {
   const { can } = useAuthz();
@@ -70,7 +71,8 @@ export default function ProprietairesShadcn() {
   const [selectedStatut, setSelectedStatut] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProprietaire, setSelectedProprietaire] = useState(null);
@@ -98,14 +100,17 @@ export default function ProprietairesShadcn() {
   });
 
   const queryParams = useMemo(() => ({
-    page: pagination.pageIndex + 1,
-    per_page: pagination.pageSize,
+    page,
+    per_page: perPage,
     q: searchTerm,
-    type: selectedType === 'all' ? undefined : selectedType,
+    type_proprietaire: selectedType === 'all' ? undefined : selectedType,
     statut: selectedStatut === 'all' ? undefined : selectedStatut,
     sort_by: sortBy,
-    order: sortDir,
-  }), [pagination, searchTerm, selectedType, selectedStatut, sortBy, sortDir]);
+    sort_dir: sortDir,
+  }), [page, perPage, searchTerm, selectedStatut, selectedType, sortBy, sortDir]);
+
+  const { data, isLoading } = useGetProprietairesQuery(queryParams);
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -117,7 +122,6 @@ export default function ProprietairesShadcn() {
   };
 
 
-  const { data, isLoading, isFetching, refetch } = useGetProprietairesQuery(queryParams);
   const [createProprietaire, { isLoading: isCreating }] = useCreateProprietaireMutation();
   const [updateProprietaire, { isLoading: isUpdating }] = useUpdateProprietaireMutation();
   const [deleteProprietaire, { isLoading: isDeleting }] = useDeleteProprietaireMutation();
@@ -410,7 +414,16 @@ export default function ProprietairesShadcn() {
             </Table>
           </div>
 
-          {/* Pagination would go here */}
+          <PaginationControl
+            currentPage={page}
+            lastPage={meta.last_page}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+          />
         </CardContent>
       </Card>
 

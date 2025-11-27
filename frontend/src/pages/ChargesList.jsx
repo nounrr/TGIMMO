@@ -20,6 +20,7 @@ import { Plus, Pencil, Trash2, Search, Loader2, ArrowUpDown } from 'lucide-react
 import { useToast } from "@/hooks/use-toast";
 import useAuthz from '@/hooks/useAuthz';
 import ChargeForm from './ChargeForm';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function ChargesList() {
   const { can } = useAuthz();
@@ -29,11 +30,15 @@ export default function ChargesList() {
 
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const queryParams = useMemo(() => ({
+    page,
+    per_page: perPage,
     sort_by: sortBy,
     order: sortOrder,
-  }), [sortBy, sortOrder]);
+  }), [sortBy, sortOrder, page, perPage]);
 
   const { data, isLoading, isFetching } = useGetImputationChargesQuery(queryParams);
   const [deleteCharge] = useDeleteImputationChargeMutation();
@@ -43,7 +48,8 @@ export default function ChargesList() {
   const [editingCharge, setEditingCharge] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const charges = data?.data || []; // Pagination structure might be data.data or just data depending on controller
+  const charges = data?.data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   // Handle Delete
   const handleDelete = async (id) => {
@@ -226,6 +232,17 @@ export default function ChargesList() {
             )}
           </TableBody>
         </Table>
+        {/* Pagination */}
+        <PaginationControl
+          currentPage={page}
+          lastPage={meta.last_page}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+        />
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

@@ -95,6 +95,7 @@ function LocationMarker({ position, setPosition }) {
 
 import { useSelector } from 'react-redux';
 import { useMeQuery } from '../features/auth/authApi';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function UnitesShadcn() {
   const { can } = useAuthz();
@@ -116,7 +117,8 @@ export default function UnitesShadcn() {
   const [selectedImmeuble, setSelectedImmeuble] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapPosition, setMapPosition] = useState(null);
@@ -177,27 +179,26 @@ export default function UnitesShadcn() {
   }, [ownersRows]);
 
   const queryParams = useMemo(() => ({
-    page: pagination.pageIndex + 1,
-    per_page: pagination.pageSize,
+    page,
+    per_page: perPage,
     q: searchTerm,
     type_unite: selectedType === 'all' ? undefined : selectedType,
     statut: selectedStatut === 'all' ? undefined : selectedStatut,
     immeuble: selectedImmeuble === 'all' ? undefined : selectedImmeuble,
     sort_by: sortBy,
     sort_dir: sortDir,
-  }), [pagination, searchTerm, selectedStatut, selectedType, selectedImmeuble, sortBy, sortDir]);
+  }), [page, perPage, searchTerm, selectedStatut, selectedType, selectedImmeuble, sortBy, sortDir]);
 
   const { data, isLoading, isFetching, refetch } = useGetUnitesQuery(queryParams);
   const { data: allUnitesData } = useGetUnitesQuery({ per_page: 1000 });
   const allUnites = allUnitesData?.data || [];
 
   const distinctTypes = useMemo(() => {
-    const types = new Set(['Appartement', 'Bureau', 'Local commercial', 'Garage', 'Autre']);
-    allUnites.forEach(u => {
-        if (u.type_unite) types.add(u.type_unite);
-    });
+    const types = new Set(allUnites.map(u => u.type_unite).filter(Boolean));
     return Array.from(types).sort();
   }, [allUnites]);
+
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const { data: immeublesData } = useGetImmeublesQuery();
   const immeubles = immeublesData || [];
@@ -616,7 +617,16 @@ export default function UnitesShadcn() {
             </Table>
           </div>
 
-          {/* Pagination would go here */}
+          <PaginationControl
+            currentPage={page}
+            lastPage={meta.last_page}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+          />
         </CardContent>
       </Card>
 

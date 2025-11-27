@@ -19,17 +19,22 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Plus, User, Trash2, Filter, RefreshCw, FileText, Pencil, ArrowUpDown } from 'lucide-react';
 import { AudioRecorder } from '../components/AudioRecorder';
 import { MiniAudioPlayer } from '../components/MiniAudioPlayer';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function ApprochesProprietairesShadcn() {
   const [filters, setFilters] = useState({ proprietaire_id: '' });
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const queryParams = useMemo(() => ({
     ...filters,
+    page,
+    per_page: perPage,
     sort_by: sortBy,
     order: sortOrder,
-  }), [filters, sortBy, sortOrder]);
+  }), [filters, sortBy, sortOrder, page, perPage]);
 
   const { data, isLoading } = useGetApprocheProprietairesQuery(queryParams);
   const [createApproche, { isLoading: saving }] = useCreateApprocheProprietaireMutation();
@@ -61,6 +66,7 @@ export default function ApprochesProprietairesShadcn() {
   const proprietaires = proprietairesData?.data || [];
   
   const approches = data?.data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
   
   // Options pour react-select
   const proprietaireOptions = proprietaires.map(prop => ({
@@ -464,6 +470,17 @@ export default function ApprochesProprietairesShadcn() {
             </div>
           )}
         </CardContent>
+        {/* Pagination */}
+        <PaginationControl
+          currentPage={page}
+          lastPage={meta.last_page}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+        />
       </Card>
     </div>
   );

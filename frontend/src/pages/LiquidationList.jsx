@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Plus, Search, FileText, Calculator, Check, ArrowRight, ArrowUpDown } from 'lucide-react';
 import useAuthz from '@/hooks/useAuthz';
 import { useToast } from '@/hooks/use-toast';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function LiquidationList() {
   const { can } = useAuthz();
@@ -24,6 +25,7 @@ export default function LiquidationList() {
     annee: new Date().getFullYear().toString(),
   });
   const [historyPage, setHistoryPage] = useState(1);
+  const [historyPerPage, setHistoryPerPage] = useState(15);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
 
@@ -40,15 +42,16 @@ export default function LiquidationList() {
   // Queries
   const historyParams = useMemo(() => ({
     page: historyPage,
-    per_page: 15,
+    per_page: historyPerPage,
     ...historyFilters,
     mois: historyFilters.mois === 'all' ? undefined : historyFilters.mois,
     sort_by: sortBy,
     sort_dir: sortDir,
-  }), [historyPage, historyFilters, sortBy, sortDir]);
+  }), [historyPage, historyPerPage, historyFilters, sortBy, sortDir]);
 
   const { data: historyData, isLoading: isHistoryLoading } = useGetLiquidationsQuery(historyParams, { skip: activeTab !== 'history' });
   const historyLiquidations = historyData?.data || [];
+  const historyMeta = historyData?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const { data: pendingData, isLoading: isPendingLoading, refetch: refetchPending } = useGetPendingLiquidationsQuery(pendingFilters, { skip: activeTab !== 'pending' });
   const pendingLiquidations = pendingData?.data || [];
@@ -315,6 +318,17 @@ export default function LiquidationList() {
                 </TableBody>
               </Table>
             </CardContent>
+            {/* Pagination */}
+            <PaginationControl
+              currentPage={historyPage}
+              lastPage={historyMeta.last_page}
+              perPage={historyPerPage}
+              onPageChange={setHistoryPage}
+              onPerPageChange={setHistoryPerPage}
+              total={historyMeta.total}
+              from={historyMeta.from}
+              to={historyMeta.to}
+            />
           </Card>
         </TabsContent>
       </Tabs>

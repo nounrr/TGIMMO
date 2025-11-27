@@ -42,6 +42,7 @@ import { Search, Plus, Edit, Trash2, Shield, Users, Key, ChevronDown } from 'luc
 import PermissionsModal from '../components/modals/PermissionsModal';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function RolesPermissionsShadcn() {
   const { can } = useAuthz();
@@ -49,23 +50,25 @@ export default function RolesPermissionsShadcn() {
 
   // Roles state
   const [searchRole, setSearchRole] = useState('');
-  const [paginationRoles, setPaginationRoles] = useState({ pageIndex: 0, pageSize: 10 });
+  const [pageRoles, setPageRoles] = useState(1);
+  const [perPageRoles, setPerPageRoles] = useState(10);
   const rolesParams = useMemo(() => ({
-    page: paginationRoles.pageIndex + 1,
-    per_page: paginationRoles.pageSize,
+    page: pageRoles,
+    per_page: perPageRoles,
     q: searchRole || undefined,
     withPermissions: true,
-  }), [paginationRoles, searchRole]);
+  }), [pageRoles, perPageRoles, searchRole]);
   const { data: rolesResp, isLoading: isLoadingRoles } = useGetRolesQuery(rolesParams);
 
   // Permissions state
   const [searchPerm, setSearchPerm] = useState('');
-  const [paginationPerms, setPaginationPerms] = useState({ pageIndex: 0, pageSize: 1000 });
+  const [pagePerms, setPagePerms] = useState(1);
+  const [perPagePerms, setPerPagePerms] = useState(1000);
   const permsParams = useMemo(() => ({
-    page: paginationPerms.pageIndex + 1,
-    per_page: paginationPerms.pageSize,
+    page: pagePerms,
+    per_page: perPagePerms,
     q: searchPerm || undefined,
-  }), [paginationPerms, searchPerm]);
+  }), [pagePerms, perPagePerms, searchPerm]);
   const { data: permsResp, isLoading: isLoadingPerms } = useGetPermissionsQuery(permsParams, { skip: activeTab !== 'permissions' });
 
   const permissions = permsResp?.data || [];
@@ -94,12 +97,13 @@ export default function RolesPermissionsShadcn() {
 
   // Users state
   const [searchUser, setSearchUser] = useState('');
-  const [paginationUsers, setPaginationUsers] = useState({ pageIndex: 0, pageSize: 10 });
+  const [pageUsers, setPageUsers] = useState(1);
+  const [perPageUsers, setPerPageUsers] = useState(10);
   const usersParams = useMemo(() => ({
-    page: paginationUsers.pageIndex + 1,
-    per_page: paginationUsers.pageSize,
+    page: pageUsers,
+    per_page: perPageUsers,
     q: searchUser || undefined,
-  }), [paginationUsers, searchUser]);
+  }), [pageUsers, perPageUsers, searchUser]);
   const { data: usersResp, isLoading: isLoadingUsers } = useGetUsersQuery(usersParams, { skip: activeTab !== 'users' || !can(PERMS.users.view) });
   
   const users = usersResp?.data || [];
@@ -294,32 +298,16 @@ export default function RolesPermissionsShadcn() {
             </Card>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {rolesPagination.total} rôle(s) au total
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPaginationRoles((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
-                  disabled={rolesPagination.page <= 1}
-                >
-                  Précédent
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {rolesPagination.page} / {rolesPagination.lastPage}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPaginationRoles((p) => ({ ...p, pageIndex: p.pageIndex + 1 }))}
-                  disabled={rolesPagination.page >= rolesPagination.lastPage}
-                >
-                  Suivant
-                </Button>
-              </div>
-            </div>
+            <PaginationControl
+              currentPage={pageRoles}
+              lastPage={rolesPagination.lastPage}
+              perPage={perPageRoles}
+              onPageChange={setPageRoles}
+              onPerPageChange={setPerPageRoles}
+              total={rolesPagination.total}
+              from={rolesResp?.from || 0}
+              to={rolesResp?.to || 0}
+            />
           </TabsContent>
         )}
 
@@ -397,32 +385,16 @@ export default function RolesPermissionsShadcn() {
             </Card>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {permsPagination.total} permission(s) au total
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPaginationPerms((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
-                  disabled={permsPagination.page <= 1}
-                >
-                  Précédent
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {permsPagination.page} / {permsPagination.lastPage}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPaginationPerms((p) => ({ ...p, pageIndex: p.pageIndex + 1 }))}
-                  disabled={permsPagination.page >= permsPagination.lastPage}
-                >
-                  Suivant
-                </Button>
-              </div>
-            </div>
+            <PaginationControl
+              currentPage={pagePerms}
+              lastPage={permsPagination.lastPage}
+              perPage={perPagePerms}
+              onPageChange={setPagePerms}
+              onPerPageChange={setPerPagePerms}
+              total={permsPagination.total}
+              from={permsResp?.from || 0}
+              to={permsResp?.to || 0}
+            />
           </TabsContent>
         )}
 
@@ -505,32 +477,16 @@ export default function RolesPermissionsShadcn() {
             </Card>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {usersPagination.total} utilisateur(s) au total
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPaginationUsers((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
-                  disabled={usersPagination.page <= 1}
-                >
-                  Précédent
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {usersPagination.page} / {usersPagination.lastPage}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPaginationUsers((p) => ({ ...p, pageIndex: p.pageIndex + 1 }))}
-                  disabled={usersPagination.page >= usersPagination.lastPage}
-                >
-                  Suivant
-                </Button>
-              </div>
-            </div>
+            <PaginationControl
+              currentPage={pageUsers}
+              lastPage={usersPagination.lastPage}
+              perPage={perPageUsers}
+              onPageChange={setPageUsers}
+              onPerPageChange={setPerPageUsers}
+              total={usersPagination.total}
+              from={usersResp?.from || 0}
+              to={usersResp?.to || 0}
+            />
           </TabsContent>
         )}
       </Tabs>

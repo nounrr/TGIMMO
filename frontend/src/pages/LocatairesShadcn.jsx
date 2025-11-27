@@ -53,6 +53,7 @@ import { Search, Plus, Edit, Trash2, Phone, Mail, MapPin, CreditCard, Building2,
 
 import { useSelector } from 'react-redux';
 import { useMeQuery } from '../features/auth/authApi';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function LocatairesShadcn() {
   const { can } = useAuthz();
@@ -69,7 +70,8 @@ export default function LocatairesShadcn() {
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedLocataire, setSelectedLocataire] = useState(null);
@@ -98,24 +100,19 @@ export default function LocatairesShadcn() {
     ifiscale: '',
     adresse_bien_loue: '',
     employeur_denomination: '',
-    employeur_adresse: '',
-    type_contrat: '',
-    revenu_mensuel_net: '',
-    chiffre_affaires_dernier_ex: '',
-    exercice_annee: '',
-    anciennete_mois: '',
-    references_locatives: '',
-    statut: 'actif',
   });
 
   const queryParams = useMemo(() => ({
-    page: pagination.pageIndex + 1,
-    per_page: pagination.pageSize,
+    page,
+    per_page: perPage,
     q: searchTerm,
-    type: selectedType === 'all' ? undefined : selectedType,
+    type_personne: selectedType === 'all' ? undefined : selectedType,
     sort_by: sortBy,
     sort_dir: sortDir,
-  }), [pagination, searchTerm, selectedType, sortBy, sortDir]);
+  }), [page, perPage, searchTerm, selectedType, sortBy, sortDir]);
+
+  const { data, isLoading } = useGetLocatairesQuery(queryParams);
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -126,7 +123,6 @@ export default function LocatairesShadcn() {
     }
   };
 
-  const { data, isLoading, isFetching, refetch } = useGetLocatairesQuery(queryParams);
   const [createLocataire, { isLoading: isCreating }] = useCreateLocataireMutation();
   const [updateLocataire, { isLoading: isUpdating }] = useUpdateLocataireMutation();
   const [deleteLocataire, { isLoading: isDeleting }] = useDeleteLocataireMutation();
@@ -434,7 +430,16 @@ export default function LocatairesShadcn() {
             </Table>
           </div>
 
-          {/* Pagination would go here */}
+          <PaginationControl
+            currentPage={page}
+            lastPage={meta.last_page}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+          />
         </CardContent>
       </Card>
 

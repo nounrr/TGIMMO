@@ -9,23 +9,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import Select from 'react-select';
 import { FileText, Plus, Search, Filter, RefreshCw, Edit, FileSignature, ArrowUpDown } from 'lucide-react';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function AvenantsMandatShadcn() {
   const [q, setQ] = useState('');
   const [mandatId, setMandatId] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
   
-  const queryParams = {};
+  const queryParams = {
+    page,
+    per_page: perPage,
+    sort_by: sortBy,
+    order: sortOrder
+  };
   if (q) queryParams.q = q;
   if (mandatId && mandatId !== 'all') queryParams.mandat_id = mandatId;
-  queryParams.sort_by = sortBy;
-  queryParams.order = sortOrder;
   
-  const { data, isFetching, refetch } = useGetAvenantsQuery(Object.keys(queryParams).length > 0 ? queryParams : undefined);
+  const { data, isFetching, refetch } = useGetAvenantsQuery(queryParams);
   const { data: mandatsData } = useGetMandatsQuery({ per_page: 1000 });
   
   const rows = data?.data || data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
   const mandats = mandatsData?.data || mandatsData || [];
 
   const customSelectStyles = {
@@ -216,6 +223,17 @@ export default function AvenantsMandatShadcn() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* Pagination */}
+        <PaginationControl
+          currentPage={page}
+          lastPage={meta.last_page}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+        />
       </Card>
     </div>
   );

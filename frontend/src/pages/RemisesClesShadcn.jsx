@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import Select from 'react-select';
 import { Badge } from '@/components/ui/badge';
 import { KeyRound, Filter, RefreshCw, Eye } from 'lucide-react';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function RemisesClesShadcn() {
   const { can } = useAuthz();
@@ -22,18 +23,23 @@ export default function RemisesClesShadcn() {
   const [bailId, setBailId] = useState('');
   const [typeCle, setTypeCle] = useState('');
   const [withRemarque, setWithRemarque] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const params = useMemo(() => ({
+    page,
+    per_page: perPage,
     q: q || undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
     locataire_id: locataireId || undefined,
     bail_id: bailId || undefined,
     type: typeCle || undefined,
-  }), [q, dateFrom, dateTo, locataireId, bailId, typeCle]);
+  }), [q, dateFrom, dateTo, locataireId, bailId, typeCle, page, perPage]);
 
   const { data, isLoading } = useGetAllRemisesClesQuery(params);
   const remises = data?.data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const { data: bauxData } = useGetBauxQuery({ per_page: 1000 });
   const baux = bauxData?.data || [];
@@ -258,6 +264,17 @@ export default function RemisesClesShadcn() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* Pagination */}
+        <PaginationControl
+          currentPage={page}
+          lastPage={meta.last_page}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+        />
       </Card>
     </div>
   );

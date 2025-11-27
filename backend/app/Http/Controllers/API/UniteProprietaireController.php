@@ -19,6 +19,7 @@ class UniteProprietaireController extends Controller
     {
         $this->middleware('permission:unites.ownership.view')->only(['index']);
         $this->middleware('permission:unites.ownership.manage')->only(['store']);
+        $this->middleware('permission:unites-proprietaires.status.modifier')->only(['updateStatus']);
     }
 
     private function findLatestMandatIdFor(int $uniteId): ?int
@@ -36,11 +37,16 @@ class UniteProprietaireController extends Controller
             ->where('unite_id', $unite->id)
             ->orderBy('date_debut')
             ->get()
-            ->groupBy('date_debut')
+            ->groupBy(function ($item) {
+                return $item->date_debut->toDateString() . '|' . ($item->statut ?? 'actif');
+            })
             ->map(function ($rows) {
+                $first = $rows->first();
                 return [
-                    'date_debut' => optional($rows->first())->date_debut?->toDateString(),
-                    'date_fin' => optional($rows->first())->date_fin?->toDateString(),
+                    'date_debut' => $first->date_debut?->toDateString(),
+                    'date_fin' => $first->date_fin?->toDateString(),
+                    'statut' => $first->statut ?? 'actif',
+                    'mandat_id' => $first->mandat_id,
                     'owners' => $rows->map(function ($row) {
                         return [
                             'id' => $row->id,
@@ -68,31 +74,121 @@ class UniteProprietaireController extends Controller
         }
 
         $dateDebut = $data['date_debut'];
+        $originalDateDebut = $request->input('original_date_debut');
         $dateFin = $data['date_fin'] ?? null;
+        $mandatId = $request->input('mandat_id');
+        $applyModifierStatus = $request->boolean('apply_modifier_status');
 
         $createdDocs = [];
 
-        DB::transaction(function () use ($request, $tpl, $unite, $dateDebut, $dateFin, $data, &$createdDocs) {
-            // Replace existing group for same unite and date_debut
-            UniteProprietaire::where('unite_id', $unite->id)
-                ->whereDate('date_debut', $dateDebut)
-                ->delete();
-
-            $now = now();
+        DB::transaction(function () use ($request, $tpl, $unite, $dateDebut, $originalDateDebut, $dateFin, $data, $mandatId, $applyModifierStatus, &$createdDocs) {
+            
             $ownershipRows = [];
-            foreach ($data['owners'] as $o) {
-                $ownership = UniteProprietaire::create([
-                    'unite_id' => $unite->id,
-                    'proprietaire_id' => $o['proprietaire_id'],
-                    'part_numerateur' => $o['part_numerateur'],
-                    'part_denominateur' => $o['part_denominateur'],
-                    'date_debut' => $dateDebut,
-                    'date_fin' => $dateFin,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
-                $ownershipRows[] = $ownership;
+
+            if ($applyModifierStatus) {
+                // Versioning flow: create new active rows, mark previous snapshot as 'modifier'.
+                // Requires dropping unique constraint on (unite_id, proprietaire_id, date_debut) to allow coexistence.
+                $existingActive = UniteProprietaire::where('unite_id', $unite->id)
+                    ->whereDate('date_debut', $dateDebut)
+                    ->where('statut', 'actif')
+                    ->get();
+
+                // Mark existing active rows as modifier (historical snapshot)
+                foreach ($existingActive as $old) {
+                    $old->update(['statut' => 'modifier']);
+                }
+
+                // Mark mandat as 'modifier' if provided (business rule for document workflow/versioning)
+                if ($mandatId) {
+                    MandatGestion::where('id', $mandatId)->update(['statut' => 'modifier']);
+                }
+
+                $now = now();
+                foreach ($data['owners'] as $o) {
+                    $ownership = UniteProprietaire::create([
+                        'unite_id' => $unite->id,
+                        'proprietaire_id' => $o['proprietaire_id'],
+                        'part_numerateur' => $o['part_numerateur'],
+                        'part_denominateur' => $o['part_denominateur'],
+                        'date_debut' => $dateDebut,
+                        'date_fin' => $dateFin,
+                        'mandat_id' => $mandatId,
+                        'statut' => 'actif',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                    $ownershipRows[] = $ownership;
+                }
+            } else {
+                // Normal behavior: Sync existing group for same unite and date_debut
+                // We update existing records to preserve IDs, delete removed ones, and create new ones.
+                
+                // Use original_date_debut if provided to find the records being edited
+                $searchDate = $originalDateDebut ?: $dateDebut;
+
+                $existingRecords = UniteProprietaire::where('unite_id', $unite->id)
+                    ->whereDate('date_debut', $searchDate)
+                    ->where('statut', '!=', 'modifier')
+                    ->get();
+
+                $incomingById = collect($data['owners'])->filter(fn($o) => !empty($o['id']))->keyBy('id');
+                $incomingByProp = collect($data['owners'])->keyBy('proprietaire_id');
+                $processedRecordIds = [];
+                $processedPropIds = [];
+                $now = now();
+
+                foreach ($existingRecords as $record) {
+                    // Prefer matching by row id if provided
+                    $newData = $incomingById->get($record->id) ?? $incomingByProp->get($record->proprietaire_id);
+                    if ($newData) {
+                        // Update existing record in place
+                        $record->update([
+                            'part_numerateur' => $newData['part_numerateur'],
+                            'part_denominateur' => $newData['part_denominateur'],
+                            'proprietaire_id' => $newData['proprietaire_id'],
+                            'date_debut' => $dateDebut, // Update date_debut in case it changed
+                            'date_fin' => $dateFin,
+                            'mandat_id' => $mandatId,
+                        ]);
+                        $ownershipRows[] = $record;
+                        $processedRecordIds[] = $record->id;
+                        $processedPropIds[] = $record->proprietaire_id;
+                    } else {
+                        // Delete removed record
+                        $record->delete();
+                    }
+                }
+
+                // Create new records for added owners
+                foreach ($incomingByProp as $o) {
+                    // If owner row has an id and it was processed, skip
+                    if (!empty($o['id']) && in_array($o['id'], $processedRecordIds)) {
+                        continue;
+                    }
+                    // If this proprietaire_id is already updated, skip creation to avoid duplicates
+                    if (in_array($o['proprietaire_id'], $processedPropIds)) {
+                        continue;
+                    }
+                    // Otherwise create as new (added owner or row without prior id)
+                        $ownership = UniteProprietaire::create([
+                            'unite_id' => $unite->id,
+                            'proprietaire_id' => $o['proprietaire_id'],
+                            'part_numerateur' => $o['part_numerateur'],
+                            'part_denominateur' => $o['part_denominateur'],
+                            'date_debut' => $dateDebut,
+                            'date_fin' => $dateFin,
+                            'mandat_id' => $mandatId,
+                            'statut' => 'actif',
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]);
+                        $ownershipRows[] = $ownership;
+                }
             }
+
+            $createdDocs = $ownershipRows; // Restore variable name expected by doc generation
+
+            // Generate documents if requested
 
             // Generate documents if requested
             if ($request->boolean('generate_documents')) {
@@ -202,5 +298,29 @@ class UniteProprietaireController extends Controller
         }
         $ownership->delete();
         return response()->json(['message' => 'Supprimé']);
+    }
+
+    // Update status for an ownership group (identified by date_debut and current statut)
+    public function updateStatus(Request $request, Unite $unite)
+    {
+        $validated = $request->validate([
+            'date_debut' => ['required','date'],
+            'current_statut' => ['required','in:actif,modifier'],
+            'new_statut' => ['required','in:actif,modifier'],
+        ]);
+
+        if ($validated['current_statut'] === $validated['new_statut']) {
+            return response()->json(['message' => 'Aucun changement requis.'], 200);
+        }
+
+        $count = UniteProprietaire::where('unite_id', $unite->id)
+            ->whereDate('date_debut', $validated['date_debut'])
+            ->where('statut', $validated['current_statut'])
+            ->update(['statut' => $validated['new_statut']]);
+
+        return response()->json([
+            'message' => 'Statut mis à jour',
+            'updated' => $count,
+        ]);
     }
 }

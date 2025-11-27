@@ -131,6 +131,7 @@ Route::prefix('v1')->group(function () {
         // Répartition propriétaires par unité
         Route::get('unites/{unite}/owners-groups', [UniteProprietaireController::class, 'index']);
         Route::post('unites/{unite}/owners-groups', [UniteProprietaireController::class, 'store']);
+        Route::post('unites/{unite}/owners-groups/status', [UniteProprietaireController::class, 'updateStatus']);
         Route::delete('unites/{unite}/ownerships/{ownership}', [UniteProprietaireController::class, 'destroy']);
 
         // Rôles (CRUD) & Permissions listing

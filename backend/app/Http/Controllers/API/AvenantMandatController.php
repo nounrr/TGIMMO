@@ -73,6 +73,14 @@ class AvenantMandatController extends Controller
         $data = $this->validatedData($request, true);
         $data['created_by'] = $request->user()->id;
 
+        // If an avenant already exists for same mandat + date_effet and is not 'modifier', mark existing as 'modifier'
+        if (!empty($data['mandat_id']) && !empty($data['date_effet'])) {
+            AvenantMandat::where('mandat_id', $data['mandat_id'])
+                ->whereDate('date_effet', $data['date_effet'])
+                ->where('statut', '!=', 'modifier')
+                ->update(['statut' => 'modifier']);
+        }
+
         if ($request->hasFile('fichier')) {
             $path = $request->file('fichier')->store('avenants', 'public');
             $data['fichier_url'] = Storage::disk('public')->url($path);
@@ -250,7 +258,7 @@ class AvenantMandatController extends Controller
             'lieu_signature'       => ['nullable', 'string', 'max:120'],
             'date_signature'       => ['nullable', 'date'],
             'rep_b_user_id'        => ['required', 'exists:users,id'],
-            'statut'               => ['nullable', 'in:brouillon,signe,actif,annule'],
+            'statut'               => ['nullable', 'in:brouillon,en_validation,signe,actif,resilie,annule,modifier'],
             'fichier'              => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ]);
     }

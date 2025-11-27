@@ -50,6 +50,7 @@ import { useToast } from '@/hooks/use-toast';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
 import { Search, Plus, Edit, Trash2, Phone, Mail, Wrench, CreditCard, ArrowUpDown } from 'lucide-react';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function PrestataireShadcn() {
   const { can } = useAuthz();
@@ -58,7 +59,8 @@ export default function PrestataireShadcn() {
   const [selectedDomaine, setSelectedDomaine] = useState('all');
   const [sortBy, setSortBy] = useState('nom_raison');
   const [sortDir, setSortDir] = useState('asc');
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedPrestataire, setSelectedPrestataire] = useState(null);
@@ -76,13 +78,13 @@ export default function PrestataireShadcn() {
   });
 
   const queryParams = useMemo(() => ({
-    page: pagination.pageIndex + 1,
-    per_page: pagination.pageSize,
+    page,
+    per_page: perPage,
     q: searchTerm || undefined,
     domaine_activite: selectedDomaine !== 'all' ? selectedDomaine : undefined,
     sort_by: sortBy,
     sort_dir: sortDir,
-  }), [pagination.pageIndex, pagination.pageSize, searchTerm, selectedDomaine, sortBy, sortDir]);
+  }), [page, perPage, searchTerm, selectedDomaine, sortBy, sortDir]);
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -98,8 +100,8 @@ export default function PrestataireShadcn() {
   const [updatePrestataire, { isLoading: isUpdating }] = useUpdatePrestataireMutation();
   const [deletePrestataire, { isLoading: isDeleting }] = useDeletePrestataireMutation();
 
-  const currentPageData = useMemo(() => data?.data || [], [data?.data]);
-  const totalPages = data?.last_page || 1;
+  const rows = data?.data || data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const handleAdd = () => {
     setSelectedPrestataire(null);
@@ -308,14 +310,14 @@ export default function PrestataireShadcn() {
                   Chargement...
                 </TableCell>
               </TableRow>
-            ) : currentPageData.length === 0 ? (
+            ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Aucun prestataire trouvé
                 </TableCell>
               </TableRow>
             ) : (
-              currentPageData.map((prest) => (
+              rows.map((prest) => (
                 <TableRow key={prest.id}>
                   <TableCell>
                     <div className="font-semibold">{prest.nom_raison}</div>
@@ -385,31 +387,16 @@ export default function PrestataireShadcn() {
           </Table>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-4 border-t">
-            <div className="text-sm text-muted-foreground">
-              Page {pagination.pageIndex + 1} sur {totalPages}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPagination((p) => ({ ...p, pageIndex: p.pageIndex - 1 }))}
-                disabled={pagination.pageIndex === 0}
-              >
-                Précédent
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPagination((p) => ({ ...p, pageIndex: p.pageIndex + 1 }))}
-                disabled={pagination.pageIndex >= totalPages - 1}
-              >
-                Suivant
-              </Button>
-            </div>
-          </div>
-          )}
+          <PaginationControl
+            currentPage={page}
+            lastPage={meta.last_page}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+          />
         </CardContent>
       </Card>
 

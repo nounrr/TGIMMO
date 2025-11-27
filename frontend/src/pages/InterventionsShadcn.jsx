@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wrench, Plus, Search, Filter, AlertTriangle, Info, Calendar, CheckCircle, XCircle, Clock, Lock, ArrowUpDown } from 'lucide-react';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function InterventionsShadcn() {
   const { can } = useAuthz();
@@ -20,18 +21,23 @@ export default function InterventionsShadcn() {
   const [bailId, setBailId] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const params = useMemo(() => ({
+    page,
+    per_page: perPage,
     q: q || undefined,
     status: status !== 'all' ? status : undefined,
     urgence: urgence !== 'all' ? urgence : undefined,
     bail_id: bailId !== 'all' ? bailId : undefined,
     sort_by: sortBy,
     order: sortOrder,
-  }), [q, status, urgence, bailId, sortBy, sortOrder]);
+  }), [q, status, urgence, bailId, sortBy, sortOrder, page, perPage]);
 
   const { data, isLoading } = useGetInterventionsQuery(params);
   const items = data?.data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
   const { data: bauxData } = useGetBauxQuery({ per_page: 1000 });
   const baux = bauxData?.data || [];
   const [deleteIntervention] = useDeleteInterventionMutation();
@@ -235,6 +241,16 @@ export default function InterventionsShadcn() {
               )}
             </TableBody>
           </Table>
+          <PaginationControl
+            currentPage={page}
+            lastPage={meta.last_page}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+            total={meta.total}
+            from={meta.from}
+            to={meta.to}
+          />
         </CardContent>
       </Card>
     </div>

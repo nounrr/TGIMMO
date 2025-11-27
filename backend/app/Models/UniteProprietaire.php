@@ -13,11 +13,13 @@ class UniteProprietaire extends Model
 
     protected $fillable = [
         'unite_id',
+        'mandat_id',
         'proprietaire_id',
         'part_numerateur',
         'part_denominateur',
         'date_debut',
         'date_fin',
+        'statut',
     ];
 
     protected $casts = [

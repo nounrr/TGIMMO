@@ -64,6 +64,14 @@ export const baseApi = createApi({
       }),
       invalidatesTags: (_res, _err, arg) => [{ type: 'UniteOwnerships', id: arg.uniteId }],
     }),
+    updateUniteOwnerGroupStatus: builder.mutation({
+      query: ({ uniteId, payload }) => ({
+        url: `unites/${uniteId}/owners-groups/status`,
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: (_res, _err, arg) => [{ type: 'UniteOwnerships', id: arg.uniteId }],
+    }),
     // Mandats de gestion
     getMandats: builder.query({
       query: (params) => ({ url: 'mandats-gestion', params }),
@@ -536,6 +544,7 @@ export const {
   useGetProprietairesQuery, 
   useGetUniteOwnerGroupsQuery, 
   useSaveUniteOwnerGroupMutation, 
+  useUpdateUniteOwnerGroupStatusMutation, 
   useGetMandatsQuery, 
   useGetMandatQuery, 
   useCreateMandatMutation, 

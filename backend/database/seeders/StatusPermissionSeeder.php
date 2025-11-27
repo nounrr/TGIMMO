@@ -25,7 +25,8 @@ class StatusPermissionSeeder extends Seeder
             'termine',
             'en_attente',
             'effectue',
-            'prospect'
+            'prospect',
+            'modifier'
         ];
 
         $resources = [
@@ -37,7 +38,8 @@ class StatusPermissionSeeder extends Seeder
             'baux',
             'remises-cles',
             'approches-locataires',
-            'approches-proprietaires'
+            'approches-proprietaires',
+            'unites-proprietaires'
         ];
 
         $permissions = [];

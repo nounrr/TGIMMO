@@ -14,15 +14,20 @@ import Select from 'react-select';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Plus, Download, Search, Filter, RefreshCw, KeyRound, Pencil, Trash2, ArrowUpDown } from 'lucide-react';
 import BailStatusBadge from '../components/BailStatusBadge';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function BauxShadcn() {
   const { can } = useAuthz();
   const [filters, setFilters] = useState({ statut: '', locataire_id: '', unite_id: '', search: '' });
   const [sortBy, setSortBy] = useState('date_debut');
   const [sortDir, setSortDir] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const queryParams = useMemo(() => {
     const qp = {
+      page,
+      per_page: perPage,
       sort_by: sortBy,
       sort_dir: sortDir,
     };
@@ -31,7 +36,7 @@ export default function BauxShadcn() {
     if (filters.unite_id) qp.unite_id = filters.unite_id;
     if (filters.search) qp.search = filters.search;
     return qp;
-  }, [filters, sortBy, sortDir]);
+  }, [filters, sortBy, sortDir, page, perPage]);
 
   const { data, isLoading, isFetching } = useGetBauxQuery(queryParams);
   const [deleteBail, { isLoading: isDeleting }] = useDeleteBailMutation();
@@ -41,8 +46,12 @@ export default function BauxShadcn() {
   const locataires = (locatairesData?.data || locatairesData || []);
   const unites = (unitesData?.data || unitesData || []);
   const baux = data?.data || data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
-  const onChange = (k, v) => setFilters(f => ({ ...f, [k]: v === 'all' ? '' : v }));
+  const onChange = (k, v) => {
+    setFilters(f => ({ ...f, [k]: v === 'all' ? '' : v }));
+    setPage(1);
+  };
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -288,6 +297,17 @@ export default function BauxShadcn() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* Pagination */}
+        <PaginationControl
+          currentPage={page}
+          lastPage={meta.last_page}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+        />
       </Card>
     </div>
   );

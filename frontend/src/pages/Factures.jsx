@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useGetFacturesQuery } from '../api/baseApi';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function Factures() {
   const { can } = useAuthz();
@@ -9,16 +10,21 @@ export default function Factures() {
   const [prestataireId, setPrestataireId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const params = useMemo(() => ({
+    page,
+    per_page: perPage,
     status: status || undefined,
     prestataire_id: prestataireId || undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
-  }), [status, prestataireId, dateFrom, dateTo]);
+  }), [status, prestataireId, dateFrom, dateTo, page, perPage]);
 
   const { data, isLoading } = useGetFacturesQuery(params);
   const items = data?.data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -280,6 +286,19 @@ export default function Factures() {
             </table>
           </div>
           )}
+          
+          <div className="mt-4">
+            <PaginationControl
+              currentPage={page}
+              lastPage={meta.last_page}
+              perPage={perPage}
+              onPageChange={setPage}
+              onPerPageChange={setPerPage}
+              total={meta.total}
+              from={meta.from}
+              to={meta.to}
+            />
+          </div>
         </div>
       </div>
     </div>

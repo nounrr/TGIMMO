@@ -2,21 +2,27 @@ import React, { useMemo, useState } from 'react';
 import { useGetDevisQuery } from '../api/baseApi';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function Devis() {
   const { can } = useAuthz();
   const [status, setStatus] = useState('');
   const [prestataireId, setPrestataireId] = useState('');
   const [interventionId, setInterventionId] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const params = useMemo(() => ({
+    page,
+    per_page: perPage,
     status: status || undefined,
     prestataire_id: prestataireId || undefined,
     intervention_id: interventionId || undefined,
-  }), [status, prestataireId, interventionId]);
+  }), [status, prestataireId, interventionId, page, perPage]);
 
   const { data, isLoading } = useGetDevisQuery(params);
   const items = data?.data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   if (!can(PERMS.devis.view)) {
     return <div className="container py-4"><div className="alert alert-warning">Accès refusé</div></div>;
@@ -204,6 +210,19 @@ export default function Devis() {
             </table>
           </div>
           )}
+
+          <div className="mt-4">
+            <PaginationControl
+              currentPage={page}
+              lastPage={meta.last_page}
+              perPage={perPage}
+              onPageChange={setPage}
+              onPerPageChange={setPerPage}
+              total={meta.total}
+              from={meta.from}
+              to={meta.to}
+            />
+          </div>
         </div>
       </div>
     </div>

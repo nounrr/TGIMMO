@@ -8,13 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Plus, Search, Filter, RefreshCw, User, Eye, Edit, ArrowUpDown, Building } from 'lucide-react';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function MandatsGestionShadcn() {
   const [q, setQ] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
   
   const queryParams = {
+    page,
+    per_page: perPage,
     sort_by: sortBy,
     sort_dir: sortDir,
   };
@@ -23,6 +28,7 @@ export default function MandatsGestionShadcn() {
   const { data, isFetching, refetch } = useGetMandatsQuery(queryParams);
   
   const rows = data?.data || data || [];
+  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -168,6 +174,17 @@ export default function MandatsGestionShadcn() {
             </TableBody>
           </Table>
         </CardContent>
+        {/* Pagination */}
+        <PaginationControl
+          currentPage={page}
+          lastPage={meta.last_page}
+          perPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={setPerPage}
+          total={meta.total}
+          from={meta.from}
+          to={meta.to}
+        />
       </Card>
     </div>
   );

@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Search, Plus, Edit, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Users, Loader2 } from 'lucide-react';
+import { PaginationControl } from '@/components/PaginationControl';
 
 export default function EmployesShadcn() {
   const { can } = useAuthz();
@@ -421,72 +422,17 @@ export default function EmployesShadcn() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
 
-              {/* Pagination */}
-              <div className="flex flex-col lg:flex-row items-center justify-between gap-4 p-4 border-t">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Lignes par page</span>
-                  <Select
-                    value={`${table.getState().pagination.pageSize}`}
-                    onValueChange={(value) => {
-                      setPagination((p) => ({ ...p, pageSize: Number(value), pageIndex: 0 }));
-                    }}
-                  >
-                    <SelectTrigger className="w-[70px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[10, 20, 50].map((size) => (
-                        <SelectItem key={size} value={`${size}`}>
-                          {size}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="text-sm text-muted-foreground font-medium">
-                  Page {table.getState().pagination.pageIndex + 1} sur {totalPages || 1}
-                  {usersResp?.from !== undefined && usersResp?.to !== undefined && usersResp?.total !== undefined && (
-                    <span className="ml-2">• Affichage {usersResp.from}–{usersResp.to} sur {usersResp.total}</span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.setPageIndex(0)}
-                    disabled={!table.getCanPreviousPage()}
-                  >
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                    disabled={!table.getCanNextPage()}
-                  >
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
-                </div>
+                <PaginationControl
+                  currentPage={pagination.pageIndex + 1}
+                  lastPage={totalPages || 1}
+                  perPage={pagination.pageSize}
+                  onPageChange={(p) => setPagination(prev => ({ ...prev, pageIndex: p - 1 }))}
+                  onPerPageChange={(pp) => setPagination(prev => ({ ...prev, pageSize: pp, pageIndex: 0 }))}
+                  total={usersResp?.total || 0}
+                  from={usersResp?.from || 0}
+                  to={usersResp?.to || 0}
+                />
               </div>
             </>
           )}
