@@ -154,10 +154,6 @@ export default function EmployesShadcn() {
   const handleDeleteConfirm = async () => {
     try {
       await deleteUser(selectedUser.id).unwrap();
-      toast({
-        title: "Succès",
-        description: "L'employé a été supprimé avec succès.",
-      });
       setShowDeleteModal(false);
       setSelectedUser(null);
     } catch (err) {
@@ -171,15 +167,26 @@ export default function EmployesShadcn() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation frontend : Rôle obligatoire
+    if (formData.roles.length === 0) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner un rôle pour l'utilisateur.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const payload = {
         ...formData,
-        role_ids: formData.roles,
+        role: formData.roles.length > 0 ? formData.roles[0] : null,
       };
       delete payload.roles;
       
       if (!selectedUser) {
-        delete payload.roles;
+        // Create mode
       } else {
         delete payload.password;
         if (!formData.password) {
@@ -189,16 +196,8 @@ export default function EmployesShadcn() {
 
       if (selectedUser) {
         await updateUser({ id: selectedUser.id, ...payload }).unwrap();
-        toast({
-          title: "Succès",
-          description: "L'employé a été modifié avec succès.",
-        });
       } else {
         await createUser(payload).unwrap();
-        toast({
-          title: "Succès",
-          description: "L'employé a été créé avec succès.",
-        });
       }
       setShowFormModal(false);
       setSelectedUser(null);
@@ -545,7 +544,7 @@ export default function EmployesShadcn() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="roles">Rôles</Label>
+                <Label htmlFor="roles">Rôles *</Label>
                 <Select 
                   value={formData.roles.length > 0 ? formData.roles[0].toString() : ""} 
                   onValueChange={(value) => setFormData({ ...formData, roles: value ? [parseInt(value)] : [] })}

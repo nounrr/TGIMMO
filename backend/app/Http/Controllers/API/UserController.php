@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -41,19 +43,44 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        \Log::info('UserController::store payload', $request->all());
         $data = $this->validateData($request, true);
-        $user = new User();
-        $user->fill($data);
-        // Hash du mot de passe
-        $user->password = Hash::make($data['password']);
-        $user->save();
 
-        if (!empty($data['role'])) {
-            // Gérer les rôles uniquement via Spatie (model_has_roles)
-            $user->assignRole($data['role']);
-        }
+        return DB::transaction(function () use ($data) {
+            $user = new User();
+            $user->fill($data);
+            // Hash du mot de passe
+            $user->password = Hash::make($data['password']);
+            $user->save();
 
-        return response()->json($user, 201);
+            if (!empty($data['role'])) {
+                // Gérer les rôles uniquement via Spatie (model_has_roles)
+                // Support ID or Name lookup to be robust
+                $roleInput = $data['role'];
+                \Log::info('UserController::store assigning role', ['input' => $roleInput]);
+                $role = Role::where('guard_name', 'api')
+                    ->where(function ($q) use ($roleInput) {
+                        $q->where('name', $roleInput)
+                          ->orWhere('id', $roleInput);
+                    })
+                    ->first();
+
+                if ($role) {
+                    $user->assignRole($role);
+                    \Log::info('UserController::store role assigned', ['role' => $role->name]);
+                } else {
+                    \Log::warning('UserController::store role not found', ['input' => $roleInput]);
+                    throw new \Exception("Le rôle sélectionné est introuvable.");
+                }
+            }
+
+            // Vérification finale : l'utilisateur doit avoir un rôle
+            if ($user->roles()->count() === 0) {
+                throw new \Exception("Impossible d'attribuer le rôle à l'utilisateur. Création annulée.");
+            }
+
+            return response()->json($user, 201);
+        });
     }
 
     public function show(Request $request, User $user)
@@ -103,7 +130,7 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:150', $uniqueEmail],
             'telephone_interne' => ['nullable', 'string', 'max:50'],
             'statut' => ['nullable', Rule::in(['actif', 'inactif'])],
-            'role' => ['nullable'],
+            'role' => [$creating ? 'required' : 'nullable'],
             'password' => [$creating ? 'required' : 'nullable', 'string', 'min:8'],
         ];
 

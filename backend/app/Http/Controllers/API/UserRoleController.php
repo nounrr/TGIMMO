@@ -43,11 +43,23 @@ class UserRoleController extends Controller
 
     public function sync(Request $request, User $user)
     {
+        \Log::info('UserRoleController::sync payload', ['user_id' => $user->id, 'roles' => $request->input('roles')]);
         $data = $request->validate([
             'roles' => ['required','array'],
-            'roles.*' => ['string','distinct']
+            'roles.*' => ['required'] // Allow string name or int ID
         ]);
-        $roles = Role::whereIn('name', $data['roles'])->where('guard_name','api')->pluck('name')->all();
+        
+        // Find roles by name OR id
+        $roles = Role::where('guard_name', 'api')
+            ->where(function($q) use ($data) {
+                $q->whereIn('name', $data['roles'])
+                  ->orWhereIn('id', $data['roles']);
+            })
+            ->pluck('name')
+            ->all();
+
+        \Log::info('UserRoleController::sync found roles', ['roles' => $roles]);
+
         $user->syncRoles($roles);
         return response()->json(['roles' => $user->getRoleNames()]);
     }

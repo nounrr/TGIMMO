@@ -190,9 +190,9 @@ export default function ApprochesProprietairesShadcn() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
           <MessageSquare className="h-8 w-8 text-primary" />
-          Approches Propriétaires
+          Prospection Propriétaires
         </h1>
-        <p className="text-slate-500">Gérer les approches commerciales pour vos propriétaires</p>
+        <p className="text-slate-500"></p>
       </div>
 
       {/* Info si absence permission création */}
@@ -211,7 +211,7 @@ export default function ApprochesProprietairesShadcn() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               {editingId ? <Pencil className="h-5 w-5 text-primary" /> : <Plus className="h-5 w-5" />}
-              {editingId ? "Modifier l'approche" : "Nouvelle approche"}
+              {editingId ? "Modifier prospection" : "Nouvelle prospection"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -255,12 +255,12 @@ export default function ApprochesProprietairesShadcn() {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     <FileText className="h-4 w-4 text-info" />
-                    Description de l'approche {(audioBlob || existingAudioUrl) ? '' : <span className="text-red-500">*</span>}
+                    Description {(audioBlob || existingAudioUrl) ? '' : <span className="text-red-500">*</span>}
                   </Label>
                   <Textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder={(audioBlob || existingAudioUrl) ? "Description (optionnelle avec audio)..." : "Décrivez l'approche commerciale effectuée..."}
+                    placeholder={(audioBlob || existingAudioUrl) ? "Description (optionnelle avec audio)..." : "Décrivez prospection commerciale effectuée..."}
                     rows={4}
                   />
                   
@@ -295,7 +295,7 @@ export default function ApprochesProprietairesShadcn() {
                   ) : (
                     <>
                       {editingId ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                      {editingId ? "Mettre à jour" : "Ajouter l'approche"}
+                      {editingId ? "Mettre à jour" : "Ajouter prospection"}
                     </>
                   )}
                 </Button>

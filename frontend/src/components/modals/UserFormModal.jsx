@@ -11,7 +11,7 @@ export default function UserFormModal({ show, onHide, user }) {
   const [service, setService] = useState(user?.service || '');
   const [statut, setStatut] = useState(user?.statut || 'actif');
   const [password, setPassword] = useState('');
-  const [selectedRoles, setSelectedRoles] = useState(user?.roles?.map((r) => r.name) || []);
+  const [selectedRoles, setSelectedRoles] = useState(user?.roles?.map((r) => r.id) || []);
 
   const { data: rolesResp } = useGetRolesQuery({ per_page: 100 });
   const roles = useMemo(() => rolesResp?.data || [], [rolesResp?.data]);
@@ -29,12 +29,12 @@ export default function UserFormModal({ show, onHide, user }) {
     setService(user?.service || '');
     setStatut(user?.statut || 'actif');
     setPassword('');
-    setSelectedRoles(user?.roles?.map((r) => r.name) || []);
+    setSelectedRoles(user?.roles?.map((r) => r.id) || []);
   }, [show, user]);
 
-  const onToggleRole = (roleName) => {
+  const onToggleRole = (roleId) => {
     setSelectedRoles((prev) =>
-      prev.includes(roleName) ? prev.filter((r) => r !== roleName) : [...prev, roleName]
+      prev.includes(roleId) ? prev.filter((r) => r !== roleId) : [...prev, roleId]
     );
   };
 
@@ -50,6 +50,10 @@ export default function UserFormModal({ show, onHide, user }) {
         saved = await updateUser(payload).unwrap();
       } else {
         const payload = { name, email, telephone_interne: telephoneInterne, fonction: fonction || null, service: service || null };
+        // Assign at least one role directly at creation (backend supports single 'role')
+        if (selectedRoles.length > 0) {
+          payload.role = selectedRoles[0];
+        }
         if (password) {
           payload.password = password;
         }
@@ -120,11 +124,11 @@ export default function UserFormModal({ show, onHide, user }) {
                   <label className="form-label fw-semibold mb-1">Rôles</label>
                   <div className="d-flex flex-wrap gap-2">
                     {roles.map((r) => {
-                      const checked = selectedRoles.includes(r.name);
+                      const checked = selectedRoles.includes(r.id);
                       return (
                         <button type="button"
                           key={r.id}
-                          onClick={() => onToggleRole(r.name)}
+                          onClick={() => onToggleRole(r.id)}
                           className={`btn btn-sm ${checked ? 'btn-primary' : 'btn-outline-secondary'}`}
                         >
                           {r.name}

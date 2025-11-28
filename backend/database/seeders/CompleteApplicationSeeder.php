@@ -58,6 +58,7 @@ class CompleteApplicationSeeder extends Seeder
             UniteOwnershipPermissionSeeder::class,
             LiquidationPermissionSeeder::class,
             StatusPermissionSeeder::class,
+            AudioPermissionSeeder::class,
         ]);
 
         $this->command->info('Creation des utilisateurs...');

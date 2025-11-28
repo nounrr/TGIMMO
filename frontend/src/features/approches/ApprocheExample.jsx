@@ -28,7 +28,7 @@ export default function ApprocheExample({ proprietaireId, locataireId }) {
         {proprietaireId ? (
           <>
             <form onSubmit={async e => { e.preventDefault(); if (!descriptionP.trim()) return; await createProp({ proprietaire_id: proprietaireId, description: descriptionP }); setDescriptionP(''); }} className="d-flex gap-2 mb-2">
-              <input className="form-control" value={descriptionP} onChange={e => setDescriptionP(e.target.value)} placeholder="Nouvelle approche..." />
+              <input className="form-control" value={descriptionP} onChange={e => setDescriptionP(e.target.value)} placeholder="Nouvelle prospection..." />
               <button className="btn btn-primary" disabled={savingP}>Ajouter</button>
             </form>
             <ul className="list-group small">
@@ -47,7 +47,7 @@ export default function ApprocheExample({ proprietaireId, locataireId }) {
         {locataireId ? (
           <>
             <form onSubmit={async e => { e.preventDefault(); if (!descriptionL.trim()) return; await createLoc({ locataire_id: locataireId, description: descriptionL }); setDescriptionL(''); }} className="d-flex gap-2 mb-2">
-              <input className="form-control" value={descriptionL} onChange={e => setDescriptionL(e.target.value)} placeholder="Nouvelle approche..." />
+              <input className="form-control" value={descriptionL} onChange={e => setDescriptionL(e.target.value)} placeholder="Nouvelle prospection..." />
               <button className="btn btn-primary" disabled={savingL}>Ajouter</button>
             </form>
             <ul className="list-group small">
