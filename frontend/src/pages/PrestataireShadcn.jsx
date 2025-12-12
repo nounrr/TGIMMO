@@ -496,8 +496,10 @@ export default function PrestataireShadcn() {
                 <Label htmlFor="ice">ICE</Label>
                 <Input
                   id="ice"
+                  maxLength={15}
+                  placeholder="15 chiffres"
                   value={formData.ice}
-                  onChange={(e) => setFormData({ ...formData, ice: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, ice: e.target.value.replace(/\D/g, '') })}
                 />
               </div>
               <div className="md:col-span-2">

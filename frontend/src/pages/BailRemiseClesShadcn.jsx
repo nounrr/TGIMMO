@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useGetBailQuery, useGetRemisesClesQuery, useCreateRemiseCleMutation } from '../api/baseApi';
+import { useGetBailQuery, useGetRemisesClesQuery, useCreateRemiseCleMutation, useUpdateRemiseCleMutation } from '../api/baseApi';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,161 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { KeyRound, ArrowLeft, Plus, X, RefreshCw, Calendar, User, Building2, CheckCircle2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import RemiseCleDocEditor from '@/components/RemiseCleDocEditor';
+import { KeyRound, ArrowLeft, Plus, X, RefreshCw, Calendar, User, Building2, CheckCircle2, FileText, Pencil } from 'lucide-react';
+
+const normalizeCles = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    const out = [];
+    const mapping = {
+      porte_principale: 'Porte principale',
+      boite_lettres: 'Boîte aux lettres',
+      portail_garage: 'Portail / Garage'
+    };
+    Object.entries(mapping).forEach(([key, label]) => {
+      const node = raw[key];
+      if (!node) return;
+      const qty = node.nombre ?? node.count;
+      const checked = node.checked === undefined || node.checked === true;
+      if (checked && qty && qty > 0) {
+        out.push({ type: key, label, nombre: qty });
+      }
+    });
+    if (Array.isArray(raw.autres)) {
+      raw.autres.forEach(a => {
+        if (!a) return;
+        const qty = a.nombre ?? a.count;
+        if (a.label && qty && qty > 0) {
+          out.push({ type: 'autre', label: a.label, nombre: qty });
+        }
+      });
+    }
+    return out;
+  }
+  return [];
+};
+
+function RemiseCleEditForm({ remise, onSuccess }) {
+  const [updateRemise, { isLoading }] = useUpdateRemiseCleMutation();
+  
+  const [dateRemise, setDateRemise] = useState('');
+  const [portes, setPortes] = useState({ checked: false, nombre: 0 });
+  const [boites, setBoites] = useState({ checked: false, nombre: 0 });
+  const [portails, setPortails] = useState({ checked: false, nombre: 0 });
+  const [autresList, setAutresList] = useState([]);
+  const [remarques, setRemarques] = useState('');
+
+  useEffect(() => {
+    if (remise) {
+      setDateRemise(remise.date_remise ? new Date(remise.date_remise).toISOString().slice(0,16) : '');
+      setRemarques(remise.remarques || '');
+      
+      const cles = normalizeCles(remise.cles);
+      
+      const p = cles.find(c => c.type === 'porte_principale');
+      setPortes({ checked: !!p, nombre: p ? p.nombre : 0 });
+      
+      const b = cles.find(c => c.type === 'boite_lettres');
+      setBoites({ checked: !!b, nombre: b ? b.nombre : 0 });
+      
+      const g = cles.find(c => c.type === 'portail_garage');
+      setPortails({ checked: !!g, nombre: g ? g.nombre : 0 });
+      
+      const autres = cles.filter(c => c.type === 'autre');
+      setAutresList(autres.map(a => ({ label: a.label, nombre: a.nombre })));
+      if (autres.length === 0) setAutresList([{ label: '', nombre: 0 }]);
+    }
+  }, [remise]);
+
+  const addAutre = () => setAutresList(l => [...l, { label: '', nombre: 0 }]);
+  const updateAutre = (idx, key, val) => setAutresList(l => l.map((a, i) => i === idx ? { ...a, [key]: val } : a));
+  const removeAutre = (idx) => setAutresList(l => l.filter((_, i) => i !== idx));
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    const cles = [];
+    if (portes.checked && portes.nombre > 0) cles.push({ type: 'porte_principale', label: 'Porte principale', nombre: Number(portes.nombre) });
+    if (boites.checked && boites.nombre > 0) cles.push({ type: 'boite_lettres', label: 'Boîte aux lettres', nombre: Number(boites.nombre) });
+    if (portails.checked && portails.nombre > 0) cles.push({ type: 'portail_garage', label: 'Portail / Garage', nombre: Number(portails.nombre) });
+    const autres = autresList.map(a => ({ ...a, nombre: Number(a.nombre) }))
+      .filter(a => a.label && a.nombre > 0)
+      .map(a => ({ type: 'autre', label: a.label, nombre: a.nombre }));
+
+    const payload = { date_remise: new Date(dateRemise).toISOString(), cles: [...cles, ...autres], remarques: remarques || undefined };
+    if (payload.cles.length === 0) { alert('Veuillez sélectionner au moins une clé avec une quantité.'); return; }
+    
+    try {
+      await updateRemise({ id: remise.id, payload }).unwrap();
+      if (onSuccess) onSuccess();
+    } catch (e) { console.error(e); alert("Erreur lors de la modification"); }
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label>Date & heure</Label>
+        <Input type="datetime-local" value={dateRemise} onChange={(e) => setDateRemise(e.target.value)} required />
+      </div>
+
+      <div className="space-y-3">
+        <Label>Clés remises</Label>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox id="edit_porte_principale" checked={portes.checked} onCheckedChange={(v) => setPortes(p => ({ ...p, checked: !!v }))} />
+              <Label htmlFor="edit_porte_principale" className="font-normal">Porte principale</Label>
+            </div>
+            <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={portes.nombre} onChange={(e) => setPortes(p => ({ ...p, nombre: e.target.value }))} disabled={!portes.checked} />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox id="edit_boite_lettres" checked={boites.checked} onCheckedChange={(v) => setBoites(p => ({ ...p, checked: !!v }))} />
+              <Label htmlFor="edit_boite_lettres" className="font-normal">Boîte aux lettres</Label>
+            </div>
+            <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={boites.nombre} onChange={(e) => setBoites(p => ({ ...p, nombre: e.target.value }))} disabled={!boites.checked} />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox id="edit_portail" checked={portails.checked} onCheckedChange={(v) => setPortails(p => ({ ...p, checked: !!v }))} />
+              <Label htmlFor="edit_portail" className="font-normal">Portail / Garage</Label>
+            </div>
+            <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={portails.nombre} onChange={(e) => setPortails(p => ({ ...p, nombre: e.target.value }))} disabled={!portails.checked} />
+          </div>
+        </div>
+
+        <div className="pt-2">
+          <div className="flex items-center justify-between mb-2">
+            <Label className="mb-0">Autres éléments</Label>
+            <Button type="button" variant="outline" size="sm" onClick={addAutre} className="gap-1"><Plus className="h-4 w-4" /> Ajouter</Button>
+          </div>
+          <div className="space-y-2">
+            {autresList.map((a, idx) => (
+              <div className="flex items-center gap-2" key={idx}>
+                <Input placeholder="Ex: télécommande, badge" value={a.label} onChange={(e) => updateAutre(idx, 'label', e.target.value)} />
+                <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={a.nombre} onChange={(e) => updateAutre(idx, 'nombre', e.target.value)} />
+                <Button type="button" variant="ghost" size="icon" onClick={() => removeAutre(idx)}><X className="h-4 w-4" /></Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Remarques (optionnel)</Label>
+        <Textarea rows={3} placeholder="Observations, précisions sur les clés..." value={remarques} onChange={(e) => setRemarques(e.target.value)} />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2 border-t">
+        <Button type="submit" disabled={isLoading} className="gap-2">
+          {isLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Enregistrer les modifications
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 export default function BailRemiseClesShadcn() {
   const { id } = useParams();
@@ -30,42 +184,14 @@ export default function BailRemiseClesShadcn() {
   const [portails, setPortails] = useState({ checked: false, nombre: 0 });
   const [autresList, setAutresList] = useState([{ label: '', nombre: 0 }]);
   const [remarques, setRemarques] = useState('');
+  const [selectedRemise, setSelectedRemise] = useState(null);
 
   const addAutre = () => setAutresList(l => [...l, { label: '', nombre: 0 }]);
   const updateAutre = (idx, key, val) => setAutresList(l => l.map((a, i) => i === idx ? { ...a, [key]: val } : a));
   const removeAutre = (idx) => setAutresList(l => l.filter((_, i) => i !== idx));
 
-  const normalizeCles = (raw) => {
-    if (Array.isArray(raw)) return raw;
-    if (raw && typeof raw === 'object') {
-      const out = [];
-      const mapping = {
-        porte_principale: 'Porte principale',
-        boite_lettres: 'Boîte aux lettres',
-        portail_garage: 'Portail / Garage'
-      };
-      Object.entries(mapping).forEach(([key, label]) => {
-        const node = raw[key];
-        if (!node) return;
-        const qty = node.nombre ?? node.count;
-        const checked = node.checked === undefined || node.checked === true;
-        if (checked && qty && qty > 0) {
-          out.push({ type: key, label, nombre: qty });
-        }
-      });
-      if (Array.isArray(raw.autres)) {
-        raw.autres.forEach(a => {
-          if (!a) return;
-          const qty = a.nombre ?? a.count;
-          if (a.label && qty && qty > 0) {
-            out.push({ type: 'autre', label: a.label, nombre: qty });
-          }
-        });
-      }
-      return out;
-    }
-    return [];
-  };
+  // normalizeCles moved outside component to be reusable
+
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -126,21 +252,21 @@ export default function BailRemiseClesShadcn() {
                         <Checkbox id="porte_principale" checked={portes.checked} onCheckedChange={(v) => setPortes(p => ({ ...p, checked: !!v }))} />
                         <Label htmlFor="porte_principale" className="font-normal">Porte principale</Label>
                       </div>
-                      <Input type="number" min="0" className="w-28" placeholder="Qté" value={portes.nombre} onChange={(e) => setPortes(p => ({ ...p, nombre: e.target.value }))} disabled={!portes.checked} />
+                      <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={portes.nombre} onChange={(e) => setPortes(p => ({ ...p, nombre: e.target.value }))} disabled={!portes.checked} />
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                         <Checkbox id="boite_lettres" checked={boites.checked} onCheckedChange={(v) => setBoites(p => ({ ...p, checked: !!v }))} />
                         <Label htmlFor="boite_lettres" className="font-normal">Boîte aux lettres</Label>
                       </div>
-                      <Input type="number" min="0" className="w-28" placeholder="Qté" value={boites.nombre} onChange={(e) => setBoites(p => ({ ...p, nombre: e.target.value }))} disabled={!boites.checked} />
+                      <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={boites.nombre} onChange={(e) => setBoites(p => ({ ...p, nombre: e.target.value }))} disabled={!boites.checked} />
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                         <Checkbox id="portail" checked={portails.checked} onCheckedChange={(v) => setPortails(p => ({ ...p, checked: !!v }))} />
                         <Label htmlFor="portail" className="font-normal">Portail / Garage</Label>
                       </div>
-                      <Input type="number" min="0" className="w-28" placeholder="Qté" value={portails.nombre} onChange={(e) => setPortails(p => ({ ...p, nombre: e.target.value }))} disabled={!portails.checked} />
+                      <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={portails.nombre} onChange={(e) => setPortails(p => ({ ...p, nombre: e.target.value }))} disabled={!portails.checked} />
                     </div>
                   </div>
 
@@ -153,7 +279,7 @@ export default function BailRemiseClesShadcn() {
                       {autresList.map((a, idx) => (
                         <div className="flex items-center gap-2" key={idx}>
                           <Input placeholder="Ex: télécommande, badge" value={a.label} onChange={(e) => updateAutre(idx, 'label', e.target.value)} />
-                          <Input type="number" min="0" className="w-28" placeholder="Qté" value={a.nombre} onChange={(e) => updateAutre(idx, 'nombre', e.target.value)} />
+                          <Input type="number" onWheel={(e) => e.target.blur()} min="0" className="w-28" placeholder="Qté" value={a.nombre} onChange={(e) => updateAutre(idx, 'nombre', e.target.value)} />
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeAutre(idx)}><X className="h-4 w-4" /></Button>
                         </div>
                       ))}
@@ -216,6 +342,9 @@ export default function BailRemiseClesShadcn() {
                         <User className="h-3 w-3" /> Ajouté par <span className="text-slate-700">{r.user.name || 'Utilisateur'}</span>
                       </div>
                     )}
+                    <Button variant="outline" size="sm" className="mt-2 w-full gap-2" onClick={() => setSelectedRemise(r)}>
+                      <Pencil className="h-4 w-4" /> Détails / Modifier
+                    </Button>
                   </div>
                 ))
               )}
@@ -223,6 +352,28 @@ export default function BailRemiseClesShadcn() {
           </Card>
         )}
       </div>
+
+      <Dialog open={!!selectedRemise} onOpenChange={(open) => !open && setSelectedRemise(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Détails de la remise de clés</DialogTitle>
+          </DialogHeader>
+          {selectedRemise && (
+            <Tabs defaultValue="info" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="info">Informations</TabsTrigger>
+                <TabsTrigger value="doc">Document (PV)</TabsTrigger>
+              </TabsList>
+              <TabsContent value="info">
+                <RemiseCleEditForm remise={selectedRemise} onSuccess={() => { setSelectedRemise(null); refetch(); }} />
+              </TabsContent>
+              <TabsContent value="doc">
+                <RemiseCleDocEditor remiseCle={selectedRemise} />
+              </TabsContent>
+            </Tabs>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

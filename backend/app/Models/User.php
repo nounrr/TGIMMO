@@ -30,6 +30,10 @@ class User extends Authenticatable
         'telephone_interne',
         'statut',
         'photo',
+        'status_add_allowed',
+        'status_edit_allowed',
+        'status_view_allowed',
+        'status_delete_allowed',
     ];
 
     /**

@@ -10,7 +10,7 @@ export default function Layout() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <SidebarInset className="flex-1 overflow-auto">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-6 lg:hidden">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-6">
             <SidebarTrigger />
             <h1 className="text-lg font-semibold">TGI</h1>
           </header>

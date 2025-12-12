@@ -119,6 +119,7 @@ export default function LiquidationForm({ onSuccess, onCancel }) {
           <Label>Année</Label>
           <Input 
             type="number" 
+            onWheel={(e) => e.target.blur()}
             value={formData.annee} 
             onChange={(e) => {
               setFormData(prev => ({ ...prev, annee: parseInt(e.target.value) }));

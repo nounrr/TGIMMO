@@ -1,26 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useGetRolesQuery } from '../../features/roles/rolesApi';
-import { 
-  useGetUserRolesQuery, 
-  useGetUserPermissionsQuery, 
-  useSyncUserRolesMutation, 
-  useGetPermissionsQuery, 
-  useSyncUserPermissionsMutation,
-  useSyncRolePermissionsMutation,
-  useCreateRoleMutation,
-  useUpdateRoleMutation
-} from '../../features/roles/rolesApi';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Shield, Key, ChevronDown } from 'lucide-react';
-import useAuthz from '../../hooks/useAuthz';
-import { PERMS } from '../../utils/permissionKeys';
+import { Eye, PlusCircle, Edit3, Trash2 } from 'lucide-react';
+
+const COMMON_STATUSES = [
+  { value: 'brouillon', label: 'Brouillon' },
+  { value: 'en_validation', label: 'En validation' },
+  { value: 'signe', label: 'Signé' },
+  { value: 'actif', label: 'Actif' },
+  { value: 'modifier', label: 'Modifier (Historique)' },
+  { value: 'resilie', label: 'Résilié' },
+  { value: 'archive', label: 'Archivé' },
+  { value: 'cloture', label: 'Clôturé' },
+];
 
 export default function PermissionsModal({ show, onHide, type, data }) {
   const { can } = useAuthz();
@@ -38,6 +27,10 @@ export default function PermissionsModal({ show, onHide, type, data }) {
   // States pour User
   const [selectedUserRoleIds, setSelectedUserRoleIds] = useState([]);
   const [selectedUserPermIds, setSelectedUserPermIds] = useState([]);
+
+  // Status Permissions State
+  // Structure: { resource: { add: '', edit: '', view: '', delete: '' } }
+  const [statusConfig, setStatusConfig] = useState({});
 
   const userId = isUser ? data?.id : null;
 
@@ -59,6 +52,62 @@ export default function PermissionsModal({ show, onHide, type, data }) {
     });
     return groups;
   }, [allPermissions]);
+
+  // Initialize status config from data
+  useEffect(() => {
+    if (!show || !data) return;
+    
+    const parseJSON = (str) => {
+      try { return str ? JSON.parse(str) : {}; } catch (e) { return {}; }
+    };
+
+    const add = parseJSON(data.status_add_allowed);
+    const edit = parseJSON(data.status_edit_allowed);
+    const view = parseJSON(data.status_view_allowed);
+    const del = parseJSON(data.status_delete_allowed);
+
+    // Merge into resource-centric structure
+    const resources = new Set([
+      ...Object.keys(add), 
+      ...Object.keys(edit), 
+      ...Object.keys(view), 
+      ...Object.keys(del),
+      ...Object.keys(groupedPermissions) // Also include all known resources
+    ]);
+
+    const newConfig = {};
+    resources.forEach(res => {
+      newConfig[res] = {
+        add: add[res] || '',
+        edit: edit[res] || '',
+        view: view[res] || '',
+        delete: del[res] || ''
+      };
+    });
+    setStatusConfig(newConfig);
+  }, [show, data, groupedPermissions]);
+
+  const toggleStatus = (resource, type, statusValue) => {
+    setStatusConfig(prev => {
+      const currentStr = prev[resource]?.[type] || '';
+      const currentList = currentStr ? currentStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+      
+      let newList;
+      if (currentList.includes(statusValue)) {
+        newList = currentList.filter(s => s !== statusValue);
+      } else {
+        newList = [...currentList, statusValue];
+      }
+      
+      return {
+        ...prev,
+        [resource]: {
+          ...prev[resource],
+          [type]: newList.join(',')
+        }
+      };
+    });
+  };
 
   // Fetch roles (for user assignment)
   const { data: rolesResp } = useGetRolesQuery({ per_page: 200, withPermissions: true }, { skip: !show || isRole });
@@ -194,13 +243,43 @@ export default function PermissionsModal({ show, onHide, type, data }) {
     e?.preventDefault();
     setSaving(true);
     try {
+      // Prepare status permissions payload
+      const statusPayload = {
+        status_add_allowed: {},
+        status_edit_allowed: {},
+        status_view_allowed: {},
+        status_delete_allowed: {}
+      };
+
+      Object.entries(statusConfig).forEach(([res, conf]) => {
+        if (conf.add) statusPayload.status_add_allowed[res] = conf.add;
+        if (conf.edit) statusPayload.status_edit_allowed[res] = conf.edit;
+        if (conf.view) statusPayload.status_view_allowed[res] = conf.view;
+        if (conf.delete) statusPayload.status_delete_allowed[res] = conf.delete;
+      });
+
+      // Stringify for backend
+      const finalStatusPayload = {
+        status_add_allowed: JSON.stringify(statusPayload.status_add_allowed),
+        status_edit_allowed: JSON.stringify(statusPayload.status_edit_allowed),
+        status_view_allowed: JSON.stringify(statusPayload.status_view_allowed),
+        status_delete_allowed: JSON.stringify(statusPayload.status_delete_allowed),
+      };
+
       if (isRole) {
         // Save role
+        const payload = {
+            name: roleName,
+            permissions: selectedRolePermissions,
+            ...finalStatusPayload
+        };
+
         if (isEdit) {
-          await updateRole({ id: data.id, name: roleName }).unwrap();
-          await syncRolePerms({ id: data.id, permissions: selectedRolePermissions }).unwrap();
+          await updateRole({ id: data.id, ...payload }).unwrap();
+          // syncRolePerms is redundant if updateRole handles it, but keeping for safety if backend needs it separate
+          // Actually RoleController::update handles permissions if passed.
         } else {
-          await createRole({ name: roleName, permissions: selectedRolePermissions }).unwrap();
+          await createRole(payload).unwrap();
         }
       } else if (isUser) {
         // Save user permissions
@@ -212,7 +291,11 @@ export default function PermissionsModal({ show, onHide, type, data }) {
           await syncUserRoles({ userId, roles: roleNamesToSend }).unwrap();
         }
         if (can(PERMS.users.update)) {
-          await syncUserPermissions({ userId, permissions: permsToSend }).unwrap();
+          await syncUserPermissions({ 
+              userId, 
+              permissions: permsToSend,
+              ...finalStatusPayload
+          }).unwrap();
         }
       }
       onHide?.();
@@ -368,25 +451,64 @@ export default function PermissionsModal({ show, onHide, type, data }) {
                             </div>
                         )}
 
-                        {statusPerms.length > 0 && (
-                            <div className="mt-4 pt-2 border-t">
-                                <Collapsible>
-                                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-slate-50 rounded hover:bg-slate-100 text-sm font-medium [&[data-state=open]>svg]:rotate-180">
-                                        <div className="flex items-center gap-2">
-                                            <Shield className="h-4 w-4 text-orange-500" />
-                                            <span>Permissions de Statut</span>
-                                            <Badge variant="secondary" className="ml-2 text-xs">{statusPerms.length}</Badge>
-                                        </div>
-                                        <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                        {/* Parent accordion for Status Permissions containing four accordions */}
+                        <div className="mt-4 pt-2 border-t">
+                          <Collapsible>
+                            <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-slate-50 rounded hover:bg-slate-100 text-sm font-medium [&[data-state=open]>svg]:rotate-180">
+                              <div className="flex items-center gap-2">
+                                <Shield className="h-4 w-4 text-orange-500" />
+                                <span>Permissions de Statut</span>
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  {COMMON_STATUSES.length}
+                                </Badge>
+                              </div>
+                              <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="pt-3">
+                              <div className="space-y-2">
+                                {[
+                                  { type: 'view', label: 'Statut à voir', icon: Eye, color: 'text-blue-600' },
+                                  { type: 'add', label: 'Statut à ajouter', icon: PlusCircle, color: 'text-green-600' },
+                                  { type: 'edit', label: 'Statut à modifier', icon: Edit3, color: 'text-amber-600' },
+                                  { type: 'delete', label: 'Statut à supprimer', icon: Trash2, color: 'text-red-600' }
+                                ].map(({ type, label, icon: Icon, color }) => (
+                                  <Collapsible key={type} className="border rounded bg-white">
+                                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 text-sm hover:bg-slate-50">
+                                      <div className="flex items-center gap-2">
+                                        <Icon className={`h-4 w-4 ${color}`} />
+                                        <span>{label}</span>
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                          {(statusConfig[group]?.[type] || '').split(',').filter(Boolean).length}
+                                        </Badge>
+                                      </div>
+                                      <ChevronDown className="h-3 w-3 text-slate-400" />
                                     </CollapsibleTrigger>
-                                    <CollapsibleContent className="pt-3">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                            {statusPerms.map(renderPermItem)}
-                                        </div>
+                                    <CollapsibleContent className="p-2 border-t bg-slate-50/30">
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        {COMMON_STATUSES.map(status => {
+                                          const currentList = (statusConfig[group]?.[type] || '').split(',').map(s => s.trim());
+                                          const isChecked = currentList.includes(status.value);
+                                          return (
+                                            <div key={status.value} className="flex items-center space-x-2">
+                                              <Checkbox 
+                                                id={`${group}-${type}-${status.value}`}
+                                                checked={isChecked}
+                                                onCheckedChange={() => toggleStatus(group, type, status.value)}
+                                              />
+                                              <Label htmlFor={`${group}-${type}-${status.value}`} className="text-xs cursor-pointer">
+                                                {status.label}
+                                              </Label>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     </CollapsibleContent>
-                                </Collapsible>
-                            </div>
-                        )}
+                                  </Collapsible>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        </div>
                       </CollapsibleContent>
                     </Collapsible>
                   );

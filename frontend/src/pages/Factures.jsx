@@ -140,6 +140,7 @@ export default function Factures() {
               </label>
               <input 
                 type="number" 
+                onWheel={(e) => e.target.blur()}
                 className="form-control form-control-lg border-2" 
                 value={prestataireId} 
                 onChange={e=>setPrestataireId(e.target.value)} 

@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasDocuments;
 
 class Bail extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDocuments;
 
     protected $table = 'baux';
 
@@ -26,11 +27,18 @@ class Bail extends Model
         'clause_particuliere',
         'observations',
         'statut',
+        'date_resiliation',
+        'doc_content',
+        'doc_variables',
+        'doc_template_key',
+        'resiliation_doc_content',
+        'resiliation_doc_variables',
     ];
 
     protected $casts = [
         'date_debut' => 'date',
         'date_fin' => 'date',
+        'date_resiliation' => 'date',
         'montant_loyer' => 'decimal:2',
         'charges' => 'decimal:2',
         'depot_garantie' => 'decimal:2',
@@ -38,6 +46,8 @@ class Bail extends Model
         'duree' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'doc_variables' => 'array',
+        'resiliation_doc_variables' => 'array',
     ];
 
     /**
@@ -62,6 +72,52 @@ class Bail extends Model
     public function remisesCles()
     {
         return $this->hasMany(RemiseCle::class, 'bail_id');
+    }
+
+    /**
+     * Périodes de franchise (remises sur loyer)
+     */
+    public function franchises()
+    {
+        return $this->hasMany(FranchiseBail::class, 'bail_id')->orderBy('date_debut');
+    }
+
+    /**
+     * Obtenir la franchise active pour une date donnée
+     */
+    public function getFranchiseActive($date = null)
+    {
+        $checkDate = $date ? \Carbon\Carbon::parse($date) : now();
+        return $this->franchises()
+            ->where('date_debut', '<=', $checkDate)
+            ->where('date_fin', '>=', $checkDate)
+            ->first();
+    }
+
+    /**
+     * Calculer le loyer avec franchise appliquée pour une date donnée
+     */
+    public function calculerLoyerAvecFranchise($date = null)
+    {
+        $franchise = $this->getFranchiseActive($date);
+        
+        $loyerNormal = $this->montant_loyer;
+        
+        if (!$franchise) {
+            return [
+                'loyer_normal' => $loyerNormal,
+                'loyer_avec_franchise' => $loyerNormal,
+                'franchise_active' => null,
+            ];
+        }
+        
+        $loyerAvecFranchise = $franchise->calculerMontantApresRemise($loyerNormal);
+        
+        return [
+            'loyer_normal' => $loyerNormal,
+            'loyer_avec_franchise' => $loyerAvecFranchise,
+            'franchise_active' => $franchise,
+        ];
     }
 
     /**

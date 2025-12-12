@@ -25,8 +25,8 @@ class ReclamationController extends Controller
 
     public function index(Request $request)
     {
-        $query = Reclamation::with(['type','bail']);
-        if ($request->filled('bail_id')) $query->where('bail_id', $request->bail_id);
+        $query = Reclamation::with(['type','unite']);
+        if ($request->filled('unite_id')) $query->where('unite_id', $request->unite_id);
         if ($request->filled('reclamation_type_id')) $query->where('reclamation_type_id', $request->reclamation_type_id);
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('source')) $query->where('source', $request->source);
@@ -36,7 +36,7 @@ class ReclamationController extends Controller
             });
         }
         if ($sortBy = $request->query('sort_by')) {
-            $direction = $request->query('order', 'asc');
+            $direction = strtolower($request->query('order', 'asc')) === 'desc' ? 'desc' : 'asc';
             if (in_array($sortBy, ['created_at', 'updated_at', 'status', 'source', 'date_reclamation'])) {
                 $query->orderBy($sortBy, $direction);
             }
@@ -68,7 +68,7 @@ class ReclamationController extends Controller
                 ]);
             }
             DB::commit();
-            return new ReclamationResource($rec->load(['type','bail','justifications']));
+            return new ReclamationResource($rec->load(['type','unite','justifications']));
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json(['message' => 'Erreur création','error' => $e->getMessage()], 500);
@@ -77,14 +77,14 @@ class ReclamationController extends Controller
 
     public function show(Reclamation $reclamation)
     {
-        $reclamation->load(['type','bail','justifications']);
+        $reclamation->load(['type','unite','justifications']);
         return new ReclamationResource($reclamation);
     }
 
     public function update(UpdateReclamationRequest $request, Reclamation $reclamation)
     {
         $reclamation->update($request->validated());
-        return new ReclamationResource($reclamation->load(['type','bail','justifications']));
+        return new ReclamationResource($reclamation->load(['type','unite','justifications']));
     }
 
     public function destroy(Reclamation $reclamation)
@@ -95,7 +95,7 @@ class ReclamationController extends Controller
 
     public function downloadDocx(Reclamation $reclamation, DocumentTemplateService $docService)
     {
-        $reclamation->load(['type','bail','justifications']);
+        $reclamation->load(['type','unite','justifications']);
         $tmpFile = $docService->generateReclamationDocx($reclamation);
         $filename = "reclamation_{$reclamation->id}.docx";
         return response()->download($tmpFile, $filename)->deleteFileAfterSend(true);

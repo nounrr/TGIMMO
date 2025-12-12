@@ -106,6 +106,12 @@ function toast({
 }) {
   const id = genId()
 
+  // Auto-close success toasts after 2 seconds
+  let duration = props.duration;
+  if (!duration && (props.title === 'Succès' || props.variant === 'success')) {
+      duration = 2000;
+  }
+
   const update = (props) =>
     dispatch({
       type: "UPDATE_TOAST",
@@ -117,6 +123,7 @@ function toast({
     type: "ADD_TOAST",
     toast: {
       ...props,
+      duration,
       id,
       open: true,
       onOpenChange: (open) => {

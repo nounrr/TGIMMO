@@ -1,25 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useGetMandatQuery, useUpdateMandatMutation, useCreateMandatMutation, useGetUnitesQuery } from '../api/baseApi';
-import { PERMS } from '../utils/permissionKeys';
+import { useGetMandatQuery, useUpdateMandatMutation } from '../api/baseApi';
 import useAuthz from '../hooks/useAuthz';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Save, ArrowLeft, Download, RefreshCw } from 'lucide-react';
+import { FileText, ArrowLeft, Download, RefreshCw, Save } from 'lucide-react';
+import MandatDocEditor from "../components/MandatDocEditor";
+import html2pdf from 'html2pdf.js';
 
-// Helper to format date from backend to YYYY-MM-DD
-const formatDateForInput = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '';
-  return date.toISOString().split('T')[0];
-};
+// No date helpers needed anymore (legacy form removed)
 
 export default function MandatEditShadcn() {
   const { id } = useParams();
@@ -30,68 +23,42 @@ export default function MandatEditShadcn() {
   const { toast } = useToast();
   const mandatState = location.state?.mandat;
   const uniteIdFromState = location.state?.uniteId;
-  const { data, isFetching } = useGetMandatQuery(id, { skip: isNew || !!mandatState });
-  const { data: unitesData } = useGetUnitesQuery({ per_page: 1000 });
-  const unites = unitesData?.data || [];
-  const [updateMandat, { isLoading: isUpdating }] = useUpdateMandatMutation();
-  const [createMandat, { isLoading: isCreating }] = useCreateMandatMutation();
+  const { data, isFetching } = useGetMandatQuery(id, { skip: !!mandatState });
   const [form, setForm] = useState(null);
+  const [updateMandat, { isLoading: isUpdating }] = useUpdateMandatMutation();
+  const editorRef = useRef();
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
-    if (isNew && !form) {
-      setForm({
-        unite_id: uniteIdFromState || '',
-        reference: '',
-        date_debut: '',
-        date_fin: '',
-        taux_gestion_pct: '',
-        assiette_honoraires: 'loyers_encaisse',
-        tva_applicable: false,
-        tva_taux: '',
-        frais_min_mensuel: '',
-        periodicite_releve: 'mensuel',
-        charge_maintenance: 'proprietaire',
-        mode_versement: 'virement',
-        description_bien: '',
-        usage_bien: 'habitation',
-        pouvoirs_accordes: '',
-        lieu_signature: '',
-        date_signature: '',
-        langue: 'fr',
-        notes_clauses: '',
-        statut: 'brouillon',
-      });
+    if (isNew) {
+      // Redirect to mandates list if trying to create new mandate via this form
+      // Creation should be done via Unite Owners tab
+      navigate('/mandats');
       return;
     }
 
     const source = mandatState || data;
     if (source && !form) {
       setForm({
-        unite_id: source.unite_id || '',
         reference: source.reference || '',
-        date_debut: formatDateForInput(source.date_debut),
-        date_fin: formatDateForInput(source.date_fin),
-        taux_gestion_pct: source.taux_gestion_pct ?? '',
-        assiette_honoraires: source.assiette_honoraires || 'loyers_encaisse',
-        tva_applicable: !!source.tva_applicable,
-        tva_taux: source.tva_taux ?? '',
-        frais_min_mensuel: source.frais_min_mensuel ?? '',
-        periodicite_releve: source.periodicite_releve || 'mensuel',
-        charge_maintenance: source.charge_maintenance || 'proprietaire',
-        mode_versement: source.mode_versement || 'virement',
-        description_bien: source.description_bien || '',
-        usage_bien: source.usage_bien || 'habitation',
-        pouvoirs_accordes: source.pouvoirs_accordes || '',
-        lieu_signature: source.lieu_signature || '',
-        date_signature: formatDateForInput(source.date_signature),
-        langue: source.langue || 'fr',
-        notes_clauses: source.notes_clauses || '',
         statut: source.statut || 'brouillon',
       });
     }
   }, [data, mandatState, form, isNew]);
 
-  if ((isFetching && !isNew && !mandatState) || !form) {
+  // Auto-download when arriving with ?download=1
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldDownload = params.get('download') === '1';
+    if (shouldDownload && editorRef.current) {
+      // Slight delay to ensure editor content is ready
+      setTimeout(() => {
+        handleDownloadPdf();
+      }, 300);
+    }
+  }, [location.search, editorRef.current]);
+
+  if ((isFetching && !mandatState) || !form) {
     return (
       <div className="flex items-center justify-center h-screen">
         <RefreshCw className="h-8 w-8 animate-spin text-primary" />
@@ -101,57 +68,85 @@ export default function MandatEditShadcn() {
 
   const onChange = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const onSave = async (e) => {
-    e.preventDefault();
-    
-    if (!form.unite_id) {
-      toast({ variant: "destructive", title: "Erreur", description: "Veuillez sélectionner une unité." });
-      return;
-    }
-
+  const handleGlobalSave = async () => {
     try {
-      const payload = {
-        ...form,
-        taux_gestion_pct: form.taux_gestion_pct === '' ? null : Number(form.taux_gestion_pct),
-        tva_taux: form.tva_taux === '' ? null : Number(form.tva_taux),
-        frais_min_mensuel: form.frais_min_mensuel === '' ? null : Number(form.frais_min_mensuel),
-      };
-      
-      if (isNew) {
-        await createMandat(payload).unwrap();
-        toast({ title: "Succès", description: "Mandat créé avec succès." });
-      } else {
-        await updateMandat({ id, payload }).unwrap();
-        toast({ title: "Succès", description: "Mandat mis à jour avec succès." });
+      let docData = {};
+      if (editorRef.current) {
+        try {
+            docData = await editorRef.current.getContent();
+        } catch (e) {
+            console.error("Error getting editor content", e);
+            toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de récupérer le contenu du document.' });
+            return;
+        }
       }
-      navigate('/mandats');
+      
+      const payload = {
+        ...form, // reference, statut
+        ...docData // doc_content, doc_variables, doc_template_key
+      };
+
+      await updateMandat({ id, payload }).unwrap();
+      toast({ title: 'Succès', description: 'Mandat enregistré.' });
     } catch (err) {
       console.error(err);
-      const msg = err?.data?.message || (isNew ? 'Erreur de création du mandat' : 'Erreur de mise à jour du mandat');
-      toast({ variant: "destructive", title: "Erreur", description: msg });
+      toast({ variant: 'destructive', title: 'Erreur', description: err?.data?.message || 'Impossible de sauvegarder.' });
     }
   };
 
-  const handleDownloadDocx = async () => {
+  const handleDownloadPdf = async () => {
+    if (!editorRef.current) return;
+    
     try {
-      const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${base}/mandats-gestion/${id}/docx`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      setIsDownloading(true);
+      toast({ title: 'Génération du PDF', description: 'Veuillez patienter...' });
+      
+      const docData = await editorRef.current.getContent();
+      let htmlContent = docData.doc_content;
+      const docVariables = docData.doc_variables;
+
+      // Client-side variable substitution
+      Object.entries(docVariables).forEach(([key, value]) => {
+          const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+          htmlContent = htmlContent.replace(regex, value || '');
       });
-      if (!res.ok) throw new Error('Download failed');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `mandat_${id}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+
+      // Post-process mixed Arabic + numbers for visual order
+      htmlContent = htmlContent.replace(/[\u0600-\u06FF]+\s*\d+/g, (segment) => {
+        const m = segment.match(/([\u0600-\u06FF]+)\s*(\d+)/);
+        if (!m) return segment;
+        const [, ar, num] = m;
+        return `<span class="rtl">${ar}<span class="ltr">\u200E${num}\u200E</span></span>`;
+      });
+
+      // Create a temporary container for PDF generation
+      const element = document.createElement('div');
+      element.innerHTML = htmlContent;
+      element.style.fontFamily = "'Tajawal', sans-serif";
+      element.style.padding = '20px';
+      element.style.width = '100%';
+      element.style.lineHeight = '1.6';
+      element.style.wordSpacing = '0.6px';
+      const style = document.createElement('style');
+      style.textContent = `.rtl{direction:rtl;unicode-bidi:isolate;} .ltr{direction:ltr;unicode-bidi:isolate;}`;
+      element.prepend(style);
+
+      const opt = {
+        margin:       [20, 12, 20, 12],
+        filename:     `mandat_${form.reference || id}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+
+      toast({ title: 'Succès', description: 'PDF téléchargé.' });
     } catch (err) {
       console.error(err);
-      alert("Impossible de télécharger le document du mandat.");
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de générer le PDF.' });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -166,252 +161,73 @@ export default function MandatEditShadcn() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
               <FileText className="h-8 w-8 text-blue-600" />
-              {isNew ? 'Nouveau mandat' : 'Modifier le mandat'}
+              Modifier le mandat
             </h1>
             <p className="text-slate-500">Référence: {form.reference || 'N/A'}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          {!isNew && (
-            <Button variant="outline" onClick={handleDownloadDocx} className="gap-2">
-              <Download className="h-4 w-4" />
-              Générer DOCX
-            </Button>
-          )}
-          <Button onClick={onSave} disabled={isCreating || isUpdating} className="gap-2 bg-blue-600 hover:bg-blue-700">
-            {(isCreating || isUpdating) ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          <Button variant="outline" onClick={handleDownloadPdf} disabled={isDownloading} className="gap-2">
+            {isDownloading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Télécharger PDF
+          </Button>
+          <Button onClick={handleGlobalSave} disabled={isUpdating || (editorRef.current && !editorRef.current.getIsReady())} className="gap-2 bg-blue-600 hover:bg-blue-700">
+            {isUpdating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Enregistrer
           </Button>
         </div>
       </div>
-
-      <form onSubmit={onSave} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Colonne Gauche: Infos Générales */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Informations Générales</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Unité</Label>
-                  <Select 
-                    value={form.unite_id ? String(form.unite_id) : ''} 
-                    onValueChange={v => onChange('unite_id', v)}
-                    disabled={!isNew}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une unité" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unites.map(u => (
-                        <SelectItem key={u.id} value={String(u.id)}>
-                          {u.numero_unite} - {u.immeuble}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Référence</Label>
-                  <Input 
-                    value={form.reference} 
-                    onChange={e => onChange('reference', e.target.value)} 
-                    placeholder="Ex: MANDAT-2024-001"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Statut</Label>
-                  <Select value={form.statut} onValueChange={v => onChange('statut', v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Statut" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="brouillon">Brouillon</SelectItem>
-                      <SelectItem value="actif">Actif</SelectItem>
-                      <SelectItem value="en_cours">En cours</SelectItem>
-                      <SelectItem value="suspendu">Suspendu</SelectItem>
-                      <SelectItem value="resilie">Résilié</SelectItem>
-                      <SelectItem value="termine">Terminé</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Date de début</Label>
-                  <Input 
-                    type="date" 
-                    value={form.date_debut} 
-                    onChange={e => onChange('date_debut', e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Date de fin</Label>
-                  <Input 
-                    type="date" 
-                    value={form.date_fin} 
-                    onChange={e => onChange('date_fin', e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Description du bien</Label>
-                  <Textarea 
-                    value={form.description_bien} 
-                    onChange={e => onChange('description_bien', e.target.value)} 
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Usage du bien</Label>
-                  <Select value={form.usage_bien} onValueChange={v => onChange('usage_bien', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="habitation">Habitation</SelectItem>
-                      <SelectItem value="commercial">Commercial</SelectItem>
-                      <SelectItem value="mixte">Mixte</SelectItem>
-                      <SelectItem value="professionnel">Professionnel</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Conditions Financières</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Taux de gestion (%)</Label>
-                  <Input 
-                    type="number" 
-                    step="0.01"
-                    value={form.taux_gestion_pct} 
-                    onChange={e => onChange('taux_gestion_pct', e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Frais minimum mensuel</Label>
-                  <Input 
-                    type="number" 
-                    step="0.01"
-                    value={form.frais_min_mensuel} 
-                    onChange={e => onChange('frais_min_mensuel', e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Assiette honoraires</Label>
-                  <Select value={form.assiette_honoraires} onValueChange={v => onChange('assiette_honoraires', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="loyers_encaisse">Loyers encaissés</SelectItem>
-                      <SelectItem value="loyers_charges_encaisse">Loyers + Charges encaissés</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Périodicité relevé</Label>
-                  <Select value={form.periodicite_releve} onValueChange={v => onChange('periodicite_releve', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mensuel">Mensuel</SelectItem>
-                      <SelectItem value="trimestriel">Trimestriel</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center space-x-2 pt-8">
-                  <Checkbox 
-                    id="tva_applicable" 
-                    checked={form.tva_applicable} 
-                    onCheckedChange={checked => onChange('tva_applicable', checked)} 
-                  />
-                  <Label htmlFor="tva_applicable">TVA Applicable</Label>
-                </div>
-                {form.tva_applicable && (
-                  <div className="space-y-2">
-                    <Label>Taux TVA (%)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      value={form.tva_taux} 
-                      onChange={e => onChange('tva_taux', e.target.value)} 
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+      <div className="space-y-6">
+        {form.statut === 'modifier' && (
+          <div className="bg-orange-50 border-l-4 border-orange-500 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <RefreshCw className="h-5 w-5 text-orange-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-orange-700">
+                  Ce mandat est marqué comme <strong>À Modifier</strong>. Les propriétaires de l'unité ont probablement changé.
+                  Veuillez vérifier les informations et mettre à jour le mandat ou créer un avenant.
+                </p>
+              </div>
+            </div>
           </div>
-
-          {/* Colonne Droite: Détails Juridiques & Notes */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Signature & Juridique</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Lieu de signature</Label>
-                  <Input 
-                    value={form.lieu_signature} 
-                    onChange={e => onChange('lieu_signature', e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Date de signature</Label>
-                  <Input 
-                    type="date" 
-                    value={form.date_signature} 
-                    onChange={e => onChange('date_signature', e.target.value)} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Langue</Label>
-                  <Select value={form.langue} onValueChange={v => onChange('langue', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fr">Français</SelectItem>
-                      <SelectItem value="ar">Arabe</SelectItem>
-                      <SelectItem value="en">Anglais</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Notes & Clauses</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Pouvoirs accordés</Label>
-                  <Textarea 
-                    value={form.pouvoirs_accordes} 
-                    onChange={e => onChange('pouvoirs_accordes', e.target.value)} 
-                    rows={4}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Notes / Clauses particulières</Label>
-                  <Textarea 
-                    value={form.notes_clauses} 
-                    onChange={e => onChange('notes_clauses', e.target.value)} 
-                    rows={4}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </form>
+        )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Informations Générales</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2 md:col-span-2">
+              <Label>Référence</Label>
+              <Input
+                value={form.reference}
+                onChange={e => onChange('reference', e.target.value)}
+                placeholder="Ex: MANDAT-2024-001"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Statut</Label>
+              <Select value={form.statut} onValueChange={v => onChange('statut', v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="brouillon">Brouillon</SelectItem>
+                  <SelectItem value="en_validation">En validation</SelectItem>
+                  <SelectItem value="signe">Signé</SelectItem>
+                  <SelectItem value="actif">Actif</SelectItem>
+                  <SelectItem value="modifier">À Modifier</SelectItem>
+                  <SelectItem value="resilie">Résilié</SelectItem>
+                  <SelectItem value="inactif">Inactif</SelectItem>
+                  <SelectItem value="en_attente">En attente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+        <MandatDocEditor ref={editorRef} mandat={{ ...data, ...form }} />
+      </div>
     </div>
   );
 }

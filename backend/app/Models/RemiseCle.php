@@ -17,11 +17,15 @@ class RemiseCle extends Model
         'cles',
         'remarques',
         'statut',
+        'doc_content',
+        'doc_variables',
+        'doc_template_key',
     ];
 
     protected $casts = [
         'date_remise' => 'datetime',
         'cles' => 'array',
+        'doc_variables' => 'array',
     ];
 
     public function bail()

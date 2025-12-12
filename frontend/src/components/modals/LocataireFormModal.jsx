@@ -62,6 +62,7 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
     adresse_bien_loue: '',
     adresse_actuelle: '',
     adresse_ar: '',
+    ville: '',
     telephone: '',
     email: '',
     profession_activite: '',
@@ -102,6 +103,7 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
         adresse_bien_loue: locataire.adresse_bien_loue || '',
         adresse_actuelle: locataire.adresse_actuelle || '',
         adresse_ar: locataire.adresse_ar || '',
+        ville: locataire.ville || '',
         telephone: locataire.telephone || '',
         email: locataire.email || '',
         profession_activite: locataire.profession_activite || '',
@@ -126,9 +128,39 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const [validationErrors, setValidationErrors] = useState({});
+
+  const validateForm = () => {
+    const errors = {};
+    const cinRegex = /^[A-Z]{1,2}[0-9]{1,6}$/;
+    const iceRegex = /^[0-9]{15}$/;
+    const phoneRegex = /^0[5-7][0-9]{8}$/;
+
+    if (formData.cin && !cinRegex.test(formData.cin)) {
+      errors.cin = "Le CIN doit commencer par 1 ou 2 lettres suivies de 1 à 6 chiffres.";
+    }
+    if (formData.ice && !iceRegex.test(formData.ice)) {
+      errors.ice = "L'ICE doit contenir exactement 15 chiffres.";
+    }
+    if (formData.telephone && !phoneRegex.test(formData.telephone)) {
+      errors.telephone = "Le numéro de téléphone doit être au format marocain (ex: 0612345678).";
+    }
+    if (formData.ifiscale && !/^[0-9]+$/.test(formData.ifiscale)) {
+      errors.ifiscale = "L'identifiant fiscal doit contenir uniquement des chiffres.";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    if (!validateForm()) {
+      return;
+    }
+
     try {
       // Map UI values to API values: 'physique' -> 'personne', 'morale' -> 'societe'
       const payload = {
@@ -204,7 +236,11 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
                         <div className="col-md-6"><label className="form-label">Date de naissance</label><input type="date" className="form-control" name="date_naissance" value={formData.date_naissance} onChange={handleChange} /></div>
                         <div className="col-md-6"><label className="form-label">Lieu de naissance</label><input type="text" className="form-control" name="lieu_naissance" value={formData.lieu_naissance} onChange={handleChange} /></div>
                         <div className="col-md-6"><label className="form-label">Nationalité</label><CountrySelect name="nationalite" value={formData.nationalite} onChange={handleChange} className="form-control" /></div>
-                        <div className="col-md-6"><label className="form-label">CIN</label><input type="text" className="form-control" name="cin" value={formData.cin} onChange={handleChange} /></div>
+                        <div className="col-md-6">
+                          <label className="form-label">CIN</label>
+                          <input type="text" className="form-control" name="cin" value={formData.cin} onChange={handleChange} />
+                          {validationErrors.cin && <div className="text-danger small mt-1">{validationErrors.cin}</div>}
+                        </div>
                         <div className="col-md-6"><label className="form-label">Situation familiale</label>
                           <select className="form-select" name="situation_familiale" value={formData.situation_familiale} onChange={handleChange}>
                             <option value="">Sélectionner</option>
@@ -214,15 +250,23 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
                             <option value="veuf">Veuf(ve)</option>
                           </select>
                         </div>
-                        <div className="col-md-6"><label className="form-label">Nb personnes au foyer</label><input type="number" className="form-control" name="nb_personnes_foyer" value={formData.nb_personnes_foyer} onChange={handleChange} min="0" /></div>
+                        <div className="col-md-6"><label className="form-label">Nb personnes au foyer</label><input type="number" className="form-control" name="nb_personnes_foyer" value={formData.nb_personnes_foyer} onChange={handleChange} onWheel={(e) => e.target.blur()} min="0" /></div>
                       </div>
                     ) : (
                       <div className="row g-3">
                         <div className="col-12"><label className="form-label">Raison sociale *</label><input type="text" className="form-control" name="raison_sociale" value={formData.raison_sociale} onChange={handleChange} required /></div>
                         <div className="col-md-6"><label className="form-label">Date de création</label><input type="date" className="form-control" name="date_creation_entreprise" value={formData.date_creation_entreprise} onChange={handleChange} /></div>
                         <div className="col-md-6"><label className="form-label">RC</label><input type="text" className="form-control" name="rc" value={formData.rc} onChange={handleChange} /></div>
-                        <div className="col-md-6"><label className="form-label">ICE</label><input type="text" className="form-control" name="ice" value={formData.ice} onChange={handleChange} /></div>
-                        <div className="col-md-6"><label className="form-label">Identifiant fiscal</label><input type="text" className="form-control" name="ifiscale" value={formData.ifiscale} onChange={handleChange} /></div>
+                        <div className="col-md-6">
+                          <label className="form-label">ICE</label>
+                          <input type="text" className="form-control" name="ice" value={formData.ice} onChange={handleChange} />
+                          {validationErrors.ice && <div className="text-danger small mt-1">{validationErrors.ice}</div>}
+                        </div>
+                        <div className="col-md-6">
+                          <label className="form-label">Identifiant fiscal</label>
+                          <input type="text" className="form-control" name="ifiscale" value={formData.ifiscale} onChange={handleChange} />
+                          {validationErrors.ifiscale && <div className="text-danger small mt-1">{validationErrors.ifiscale}</div>}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -233,10 +277,15 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
                   <div className="card-body p-4">
                     <h6 className="fw-bold mb-3" style={{ color: '#7c3aed' }}>Coordonnées</h6>
                     <div className="row g-3">
-                      <div className="col-md-6"><label className="form-label">Téléphone *</label><input type="tel" className="form-control" name="telephone" value={formData.telephone} onChange={handleChange} required /></div>
+                      <div className="col-md-6">
+                        <label className="form-label">Téléphone *</label>
+                        <input type="tel" className="form-control" name="telephone" value={formData.telephone} onChange={handleChange} required />
+                        {validationErrors.telephone && <div className="text-danger small mt-1">{validationErrors.telephone}</div>}
+                      </div>
                       <div className="col-md-6"><label className="form-label">Email</label><input type="email" className="form-control" name="email" value={formData.email} onChange={handleChange} /></div>
                       <div className="col-12"><label className="form-label">Adresse actuelle</label><textarea className="form-control" name="adresse_actuelle" value={formData.adresse_actuelle} onChange={handleChange} rows="2" /></div>
                       <div className="col-12"><label className="form-label">Adresse (Arabe)</label><textarea className="form-control" name="adresse_ar" value={formData.adresse_ar} onChange={handleChange} rows="2" dir="rtl" /></div>
+                      <div className="col-12"><label className="form-label">Ville</label><input type="text" className="form-control" name="ville" value={formData.ville} onChange={handleChange} /></div>
                       <div className="col-12"><label className="form-label">Adresse du bien loué</label><textarea className="form-control" name="adresse_bien_loue" value={formData.adresse_bien_loue} onChange={handleChange} rows="2" /></div>
                     </div>
                   </div>
@@ -261,13 +310,13 @@ export default function LocataireFormModal({ show, onHide, locataire = null }) {
                               <option value="autre">Autre</option>
                             </select>
                           </div>
-                          <div className="col-md-6"><label className="form-label">Ancienneté (mois)</label><input type="number" className="form-control" name="anciennete_mois" value={formData.anciennete_mois} onChange={handleChange} min="0" /></div>
-                          <div className="col-md-6"><label className="form-label">Revenu mensuel net (MAD)</label><input type="number" className="form-control" name="revenu_mensuel_net" value={formData.revenu_mensuel_net} onChange={handleChange} step="0.01" min="0" /></div>
+                          <div className="col-md-6"><label className="form-label">Ancienneté (mois)</label><input type="number" className="form-control" name="anciennete_mois" value={formData.anciennete_mois} onChange={handleChange} onWheel={(e) => e.target.blur()} min="0" /></div>
+                          <div className="col-md-6"><label className="form-label">Revenu mensuel net (MAD)</label><input type="number" className="form-control" name="revenu_mensuel_net" value={formData.revenu_mensuel_net} onChange={handleChange} onWheel={(e) => e.target.blur()} step="0.01" min="0" /></div>
                         </>
                       ) : (
                         <>
-                          <div className="col-md-6"><label className="form-label">Chiffre d'affaires dernier ex. (MAD)</label><input type="number" className="form-control" name="chiffre_affaires_dernier_ex" value={formData.chiffre_affaires_dernier_ex} onChange={handleChange} step="0.01" min="0" /></div>
-                          <div className="col-md-6"><label className="form-label">Année d'exercice</label><input type="number" className="form-control" name="exercice_annee" value={formData.exercice_annee} onChange={handleChange} min="1900" max="2100" /></div>
+                          <div className="col-md-6"><label className="form-label">Chiffre d'affaires dernier ex. (MAD)</label><input type="number" className="form-control" name="chiffre_affaires_dernier_ex" value={formData.chiffre_affaires_dernier_ex} onChange={handleChange} onWheel={(e) => e.target.blur()} step="0.01" min="0" /></div>
+                          <div className="col-md-6"><label className="form-label">Année d'exercice</label><input type="number" className="form-control" name="exercice_annee" value={formData.exercice_annee} onChange={handleChange} onWheel={(e) => e.target.blur()} min="1900" max="2100" /></div>
                         </>
                       )}
                       <div className="col-12"><label className="form-label">Références locatives</label><textarea className="form-control" name="references_locatives" value={formData.references_locatives} onChange={handleChange} rows="2" placeholder="Anciens propriétaires, coordonnées..." /></div>

@@ -14,7 +14,7 @@ class StoreReclamationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'bail_id' => ['required','exists:baux,id'],
+            'unite_id' => ['required','exists:unites,id'],
             'reclamation_type_id' => ['required','exists:reclamation_types,id'],
             'description' => ['required','string'],
             'source' => ['nullable','string','max:100'],

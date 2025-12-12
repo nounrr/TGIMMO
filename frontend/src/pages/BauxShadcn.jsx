@@ -12,9 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Select from 'react-select';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Download, Search, Filter, RefreshCw, KeyRound, Pencil, Trash2, ArrowUpDown } from 'lucide-react';
+import { FileText, Plus, Search, Filter, RefreshCw, KeyRound, Pencil, Trash2, ArrowUpDown } from 'lucide-react';
 import BailStatusBadge from '../components/BailStatusBadge';
 import { PaginationControl } from '@/components/PaginationControl';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function BauxShadcn() {
   const { can } = useAuthz();
@@ -62,21 +63,48 @@ export default function BauxShadcn() {
     }
   };
 
-  const handleDownloadDocx = async (bailId) => {
-    try {
-      const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${base}/baux/${bailId}/docx`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-      if (!res.ok) throw new Error('Echec du téléchargement');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `bail_${bailId}.docx`; document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url); document.body.removeChild(a);
-    } catch (e) { console.error(e); alert("Impossible de télécharger le document du bail."); }
-  };
-
   const getLocDisplay = (l) => l?.prenom || l?.nom ? `${l?.prenom ?? ''} ${l?.nom ?? ''}`.trim() : (l?.raison_sociale || `#${l?.id}`);
   const getUniteDisplay = (u) => u?.reference || u?.numero_unite || `#${u?.id}`;
+
+  const getOwnersDisplay = (owners) => {
+    if (!owners || owners.length === 0) return '—';
+    
+    const getOwnerName = (o) => {
+        return o.nom_raison || '—';
+    };
+
+    if (owners.length === 1) {
+      return <span className="text-sm font-medium text-slate-700">{getOwnerName(owners[0])}</span>;
+    }
+    
+    if (owners.length === 2) {
+      return (
+        <div className="flex flex-col text-xs">
+            <span className="font-medium text-slate-700">{getOwnerName(owners[0])}</span>
+            <span className="text-muted-foreground">& {getOwnerName(owners[1])}</span>
+        </div>
+      );
+    }
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help underline decoration-dotted text-blue-600 font-medium text-sm">
+              Plusieurs ({owners.length})
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <ul className="list-disc pl-4 text-xs">
+              {owners.map(o => (
+                <li key={o.id}>{getOwnerName(o)}</li>
+              ))}
+            </ul>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
 
   const customSelectStyles = {
     control: (provided, state) => ({
@@ -212,6 +240,7 @@ export default function BauxShadcn() {
                 </TableHead>
                 <TableHead>Locataire</TableHead>
                 <TableHead>Unité</TableHead>
+                <TableHead>Propriétaire</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead className="cursor-pointer" onClick={() => handleSort('montant_loyer')}>
                   Loyer (MAD) {sortBy === 'montant_loyer' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
@@ -228,11 +257,11 @@ export default function BauxShadcn() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Chargement...</TableCell>
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Chargement...</TableCell>
                 </TableRow>
               ) : baux.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">Aucun bail trouvé</TableCell>
+                  <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">Aucun bail trouvé</TableCell>
                 </TableRow>
               ) : (
                 baux.map((b) => (
@@ -248,6 +277,9 @@ export default function BauxShadcn() {
                       <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
                         {getUniteDisplay(b.unite)}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                        {getOwnersDisplay(b.unite?.proprietaires)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">
@@ -269,11 +301,6 @@ export default function BauxShadcn() {
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">
-                        {can(PERMS.baux.download) && (
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleDownloadDocx(b.id)} title="Télécharger DOCX">
-                            <Download className="h-4 w-4 text-blue-600" />
-                          </Button>
-                        )}
                         <Link to={`/baux/${b.id}/remise-cles`}>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Remise de clés">
                             <KeyRound className="h-4 w-4 text-amber-600" />

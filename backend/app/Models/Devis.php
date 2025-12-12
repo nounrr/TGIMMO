@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasDocuments;
 
 class Devis extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDocuments;
 
     protected $table = 'devis';
 
@@ -25,5 +26,5 @@ class Devis extends Model
 
     public function intervention() { return $this->belongsTo(Intervention::class); }
     public function prestataire() { return $this->belongsTo(Prestataire::class); }
-    public function documents() { return $this->morphMany(GedDocument::class, 'documentable'); }
+    // Documents handled via HasDocuments trait
 }

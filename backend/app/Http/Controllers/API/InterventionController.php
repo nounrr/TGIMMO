@@ -50,7 +50,7 @@ class InterventionController extends Controller
             });
         }
         if ($sortBy = $request->query('sort_by')) {
-            $direction = $request->query('order', 'asc');
+            $direction = strtolower($request->query('order', 'asc')) === 'desc' ? 'desc' : 'asc';
             if (in_array($sortBy, ['created_at', 'updated_at', 'nature_probleme', 'status', 'urgence', 'date_planifiee'])) {
                 $query->orderBy($sortBy, $direction);
             }

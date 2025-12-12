@@ -50,13 +50,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from '@/hooks/use-toast';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
-import { Search, Plus, Edit, Trash2, Home, MapPin, Maximize2, Users, Map as MapIcon, Locate, ArrowUpDown, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Home, MapPin, Maximize2, Users, Map as MapIcon, Locate, ArrowUpDown, CheckCircle2, XCircle, FilePlus2 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import ReactSelect from 'react-select';
 
 // Fix Leaflet default icon issue
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -144,39 +147,22 @@ export default function UnitesShadcn() {
     equipements: '',
     mobilier: '',
     statut: 'vacant',
+    // New fields
+    taux_gestion_pct: '',
+    assiette_honoraires: 'loyers_encaisse',
+    tva_applicable: false,
+    tva_taux: '20',
+    frais_min_mensuel: '',
+    periodicite_releve: 'trimestriel',
+    mode_versement: 'virement',
+    description_bien: '',
+    pouvoirs_accordes: '',
+    lieu_signature: '',
+    date_signature: '',
   });
   const [isCustomType, setIsCustomType] = useState(false);
 
-  const [ownersRows, setOwnersRows] = useState([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
 
-  const addOwnerRow = () => {
-    const newRows = [...ownersRows, { proprietaire_id: '', part_numerateur: 1, part_denominateur: ownersRows.length + 1 }];
-    const count = newRows.length;
-    setOwnersRows(newRows.map(r => ({ ...r, part_numerateur: 1, part_denominateur: count })));
-  };
-
-  const removeOwnerRow = (idx) => {
-    const filtered = ownersRows.filter((_, i) => i !== idx);
-    if (filtered.length === 0) {
-       setOwnersRows([]);
-       return;
-    }
-    const count = filtered.length;
-    setOwnersRows(filtered.map(r => ({ ...r, part_numerateur: 1, part_denominateur: count })));
-  };
-
-  const updateOwnerRow = (idx, field, value) => {
-    const updated = ownersRows.map((r, i) => i === idx ? { ...r, [field]: value } : r);
-    setOwnersRows(updated);
-  };
-
-  const ownersTotal = useMemo(() => {
-    return ownersRows.reduce((acc, row) => {
-      const num = parseFloat(row.part_numerateur) || 0;
-      const den = parseFloat(row.part_denominateur) || 1;
-      return acc + (den > 0 ? num / den : 0);
-    }, 0);
-  }, [ownersRows]);
 
   const queryParams = useMemo(() => ({
     page,
@@ -198,7 +184,7 @@ export default function UnitesShadcn() {
     return Array.from(types).sort();
   }, [allUnites]);
 
-  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
+  const meta = data || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const { data: immeublesData } = useGetImmeublesQuery();
   const immeubles = immeublesData || [];
@@ -274,7 +260,6 @@ export default function UnitesShadcn() {
     setSelectedUnite(null);
     setErrors({});
     setIsCustomType(false);
-    setOwnersRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
     setFormData({
       numero_unite: '',
       type_unite: 'Appartement',
@@ -290,9 +275,19 @@ export default function UnitesShadcn() {
       equipements: '',
       mobilier: '',
       statut: isCommercial ? 'en_negociation' : 'vacant',
-      proprietaire_id: '', // Note: Backend needs to handle this attachment
+      // New fields defaults
+      taux_gestion_pct: '',
+      assiette_honoraires: 'loyers_encaisse',
+      tva_applicable: false,
+      tva_taux: '20',
+      frais_min_mensuel: '',
+      periodicite_releve: 'trimestriel',
+      mode_versement: 'virement',
+      description_bien: '',
+      pouvoirs_accordes: '',
+      lieu_signature: '',
+      date_signature: '',
     });
-    setOwnersRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
     setShowFormModal(true);
   };
 
@@ -316,9 +311,20 @@ export default function UnitesShadcn() {
       equipements: unite.equipements || '',
       mobilier: unite.mobilier || '',
       statut: unite.statut || 'vacant',
-      proprietaire_id: '', // We don't load the owner here yet
+      // New fields
+      taux_gestion_pct: unite.taux_gestion_pct || '',
+      assiette_honoraires: unite.assiette_honoraires || 'loyers_encaisse',
+      tva_applicable: Boolean(unite.tva_applicable),
+      tva_taux: unite.tva_taux || '20',
+      frais_min_mensuel: unite.frais_min_mensuel || '',
+      periodicite_releve: unite.periodicite_releve || 'trimestriel',
+      mode_versement: unite.mode_versement || 'virement',
+      description_bien: unite.description_bien || '',
+      pouvoirs_accordes: unite.pouvoirs_accordes || '',
+      lieu_signature: unite.lieu_signature || '',
+      date_signature: unite.date_signature || '',
     });
-    setOwnersRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
+    
     setShowFormModal(true);
   };
 
@@ -349,7 +355,6 @@ export default function UnitesShadcn() {
       nb_appartements: formData.nb_appartements === '' ? null : formData.nb_appartements,
       superficie_m2: formData.superficie_m2 === '' ? null : formData.superficie_m2,
       etage: formData.etage === '' ? null : formData.etage,
-      owners: ownersRows.filter(r => r.proprietaire_id),
     };
 
     try {
@@ -360,9 +365,9 @@ export default function UnitesShadcn() {
         const newUnite = await createUnite(payload).unwrap();
         toast({ title: "Succès", description: "Unité créée avec succès" });
         setCreatedUniteId(newUnite.id); // Set the created unite ID
-        if (payload.owners && payload.owners.length > 0) {
-          setShowMandatModal(true);
-        }
+        // if (payload.owners && payload.owners.length > 0) {
+        //   setShowMandatModal(true);
+        // }
       }
       setShowFormModal(false);
     } catch (error) {
@@ -500,6 +505,7 @@ export default function UnitesShadcn() {
                 <SelectItem value="updated_at">Date modification</SelectItem>
                 <SelectItem value="numero_unite">N° Unité</SelectItem>
                 <SelectItem value="immeuble">Immeuble</SelectItem>
+                <SelectItem value="is_linked">Lié / Non lié</SelectItem>
               </SelectContent>
             </Select>
             <Button 
@@ -540,7 +546,12 @@ export default function UnitesShadcn() {
                       <ArrowUpDown className={`ml-2 h-4 w-4 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
                     )}
                   </TableHead>
-                  <TableHead className="text-center">Lié</TableHead>
+                  <TableHead onClick={() => handleSort('is_linked')} className="text-center cursor-pointer">
+                    Lié
+                    {sortBy === 'is_linked' && (
+                      <ArrowUpDown className={`ml-2 h-4 w-4 inline-block ${sortDir === 'asc' ? 'rotate-180' : ''}`} />
+                    )}
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -581,14 +592,26 @@ export default function UnitesShadcn() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => navigate(`/unites/${unite.id}/owners`)}
-                            title="Voir propriétaires"
-                          >
-                            <Users className="h-4 w-4" />
-                          </Button>
+                          {can(PERMS.baux.create) && Array.isArray(unite.proprietaires) && unite.proprietaires.length > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => window.location.assign(`/baux/nouveau?unite_id=${unite.id}`)}
+                              title="Créer bail pour cette unité"
+                            >
+                              <FilePlus2 className="h-4 w-4 text-green-600" />
+                            </Button>
+                          )}
+                          {unite.proprietaires && unite.proprietaires.length > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => navigate(`/unites/${unite.id}/owners`)}
+                              title="Voir propriétaires"
+                            >
+                              <Users className="h-4 w-4" />
+                            </Button>
+                          )}
                           {can(PERMS.unites.create) && (
                             <Button
                               variant="ghost"
@@ -652,244 +675,255 @@ export default function UnitesShadcn() {
                 </ul>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="numero_unite" className={errors.numero_unite ? "text-destructive" : ""}>N° Unité *</Label>
-                <Input
-                  id="numero_unite"
-                  value={formData.numero_unite}
-                  onChange={(e) => setFormData({ ...formData, numero_unite: e.target.value })}
-                  className={errors.numero_unite ? "border-destructive" : ""}
-                  required
-                />
-                {errors.numero_unite && <p className="text-xs text-destructive mt-1">{errors.numero_unite[0]}</p>}
-              </div>
-              <div>
-                <Label htmlFor="type_unite" className={errors.type_unite ? "text-destructive" : ""}>Type d'unité</Label>
-                <Select
-                  value={isCustomType ? '__custom__' : formData.type_unite}
-                  onValueChange={(value) => {
-                    if (value === '__custom__') {
-                        setIsCustomType(true);
-                        setFormData({ ...formData, type_unite: '' });
-                    } else {
-                        setIsCustomType(false);
-                        setFormData({ ...formData, type_unite: value });
-                    }
-                  }}
-                >
-                  <SelectTrigger id="type_unite" className={errors.type_unite ? "border-destructive" : ""}>
-                    <SelectValue placeholder="Sélectionner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {distinctTypes.map(t => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                    <SelectItem value="__custom__">➕ Autre (Nouveau type)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {isCustomType && (
+
+            <Tabs defaultValue="general" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="general">Informations Générales</TabsTrigger>
+                <TabsTrigger value="gestion">Gestion & Mandat</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="general" className="space-y-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="numero_unite" className={errors.numero_unite ? "text-destructive" : ""}>N° Unité</Label>
                     <Input
-                        placeholder="Saisir le nouveau type..."
-                        value={formData.type_unite}
-                        onChange={(e) => setFormData({ ...formData, type_unite: e.target.value })}
-                        className={`mt-2 ${errors.type_unite ? "border-destructive" : ""}`}
+                      id="numero_unite"
+                      value={formData.numero_unite}
+                      onChange={(e) => setFormData({ ...formData, numero_unite: e.target.value })}
+                      className={errors.numero_unite ? "border-destructive" : ""}
+                      placeholder="Laisser vide pour générer automatiquement (U_ID)"
                     />
-                )}
-                {errors.type_unite && <p className="text-xs text-destructive mt-1">{errors.type_unite[0]}</p>}
-              </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="adresse_complete">Adresse complète</Label>
-                <Input
-                  id="adresse_complete"
-                  value={formData.adresse_complete}
-                  onChange={(e) => setFormData({ ...formData, adresse_complete: e.target.value })}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="coordonnees_gps">Coordonnées GPS (Google Maps)</Label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    id="coordonnees_gps"
-                    value={formData.coordonnees_gps}
-                    onChange={(e) => setFormData({ ...formData, coordonnees_gps: e.target.value })}
-                    placeholder="Ex: 33.5731, -7.5898"
-                    className="flex-1"
-                  />
-                  <Button type="button" size="icon" onClick={openMap} title="Choisir sur la carte" className="shrink-0 bg-red-500 hover:bg-red-600 text-white">
-                    <MapIcon className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="immeuble">Immeuble</Label>
-                <Input
-                  id="immeuble"
-                  value={formData.immeuble}
-                  onChange={(e) => setFormData({ ...formData, immeuble: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="bloc">Bloc</Label>
-                <Input
-                  id="bloc"
-                  value={formData.bloc}
-                  onChange={(e) => setFormData({ ...formData, bloc: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="etage" className={errors.etage ? "text-destructive" : ""}>Étage</Label>
-                  <Input
-                    id="etage"
-                    value={formData.etage}
-                    onChange={(e) => setFormData({ ...formData, etage: e.target.value })}
-                    className={errors.etage ? "border-destructive" : ""}
-                  />
-                  {errors.etage && <p className="text-xs text-destructive mt-1">{errors.etage[0]}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="superficie_m2" className={errors.superficie_m2 ? "text-destructive" : ""}>Surface (m²)</Label>
-                  <Input
-                    id="superficie_m2"
-                    type="number"
-                    value={formData.superficie_m2}
-                    onChange={(e) => setFormData({ ...formData, superficie_m2: e.target.value })}
-                    className={errors.superficie_m2 ? "border-destructive" : ""}
-                  />
-                  {errors.superficie_m2 && <p className="text-xs text-destructive mt-1">{errors.superficie_m2[0]}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="nb_pieces" className={errors.nb_pieces ? "text-destructive" : ""}>Nb Pièces</Label>
-                  <Input
-                    id="nb_pieces"
-                    type="number"
-                    value={formData.nb_pieces}
-                    onChange={(e) => setFormData({ ...formData, nb_pieces: e.target.value })}
-                    className={errors.nb_pieces ? "border-destructive" : ""}
-                  />
-                  {errors.nb_pieces && <p className="text-xs text-destructive mt-1">{errors.nb_pieces[0]}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="nb_sdb" className={errors.nb_sdb ? "text-destructive" : ""}>Nb SDB</Label>
-                  <Input
-                    onChange={(e) => setFormData({ ...formData, nb_sdb: e.target.value })}
-                    className={errors.nb_sdb ? "border-destructive" : ""}
-                  />
-                  {errors.nb_sdb && <p className="text-xs text-destructive mt-1">{errors.nb_sdb[0]}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="nb_appartements" className={errors.nb_appartements ? "text-destructive" : ""}>Nb Apparts</Label>
-                  <Input
-                    id="nb_appartements"
-                    type="number"
-                    value={formData.nb_appartements}
-                    onChange={(e) => setFormData({ ...formData, nb_appartements: e.target.value })}
-                    className={errors.nb_appartements ? "border-destructive" : ""}
-                  />
-                  {errors.nb_appartements && <p className="text-xs text-destructive mt-1">{errors.nb_appartements[0]}</p>}
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="statut">Statut</Label>
-                <Select
-                  value={formData.statut}
-                  onValueChange={(value) => setFormData({ ...formData, statut: value })}
-                >
-                  <SelectTrigger id="statut">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isCommercial ? (
-                      <>
-                        <SelectItem value="en_negociation">En négociation</SelectItem>
-                        <SelectItem value="negociation_echouee">Négociation échouée</SelectItem>
-                      </>
-                    ) : (
-                      <>
-                        <SelectItem value="vacant">Vacant</SelectItem>
-                        <SelectItem value="loue">Loué</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="reserve">Réservé</SelectItem>
-                        <SelectItem value="en_negociation">En négociation</SelectItem>
-                        <SelectItem value="negociation_echouee">Négociation échouée</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              {/* Owners Management Section */}
-              <div className="col-span-2 border rounded-md p-4 bg-slate-50">
-                <div className="flex justify-between items-center mb-2">
-                  <Label>Propriétaires (Total: {(ownersTotal * 100).toFixed(2)}%)</Label>
-                  <Button type="button" size="sm" variant="outline" onClick={addOwnerRow}>
-                    <Plus className="h-4 w-4 mr-1" /> Ajouter
-                  </Button>
-                </div>
-                
-                {Math.abs(ownersTotal - 1) > 0.001 && (
-                  <div className="text-xs text-amber-600 mb-2 font-medium">
-                    Attention: Le total des parts n'est pas égal à 100%
+                    {errors.numero_unite && <p className="text-xs text-destructive mt-1">{errors.numero_unite[0]}</p>}
                   </div>
-                )}
-
-                <div className="space-y-2">
-                  {ownersRows.map((row, idx) => (
-                    <div key={idx} className="flex gap-2 items-start">
-                      <div className="flex-1">
-                        <Select
-                          value={row.proprietaire_id}
-                          onValueChange={(val) => updateOwnerRow(idx, 'proprietaire_id', val)}
-                        >
-                          <SelectTrigger className={!row.proprietaire_id ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Propriétaire" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {proprietaires?.map((prop) => (
-                              <SelectItem key={prop.id} value={String(prop.id)}>
-                                {prop.nom_raison}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-20">
+                  <div>
+                    <Label htmlFor="type_unite" className={errors.type_unite ? "text-destructive" : ""}>Type d'unité</Label>
+                    <Select
+                      value={isCustomType ? '__custom__' : formData.type_unite}
+                      onValueChange={(value) => {
+                        if (value === '__custom__') {
+                            setIsCustomType(true);
+                            setFormData({ ...formData, type_unite: '' });
+                        } else {
+                            setIsCustomType(false);
+                            setFormData({ ...formData, type_unite: value });
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="type_unite" className={errors.type_unite ? "border-destructive" : ""}>
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {distinctTypes.map(t => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                        <SelectItem value="__custom__">➕ Autre (Nouveau type)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {isCustomType && (
                         <Input
-                          type="number"
-                          placeholder="Num"
-                          value={row.part_numerateur}
-                          onChange={(e) => updateOwnerRow(idx, 'part_numerateur', e.target.value)}
-                          className="text-center"
+                            placeholder="Saisir le nouveau type..."
+                            value={formData.type_unite}
+                            onChange={(e) => setFormData({ ...formData, type_unite: e.target.value })}
+                            className={`mt-2 ${errors.type_unite ? "border-destructive" : ""}`}
                         />
-                      </div>
-                      <div className="flex items-center text-slate-400">/</div>
-                      <div className="w-20">
-                        <Input
-                          type="number"
-                          placeholder="Den"
-                          value={row.part_denominateur}
-                          onChange={(e) => updateOwnerRow(idx, 'part_denominateur', e.target.value)}
-                          className="text-center"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive/90"
-                        onClick={() => removeOwnerRow(idx)}
-                        disabled={ownersRows.length === 1}
-                      >
-                        <Trash2 className="h-4 w-4" />
+                    )}
+                    {errors.type_unite && <p className="text-xs text-destructive mt-1">{errors.type_unite[0]}</p>}
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="adresse_complete" className={errors.adresse_complete ? "text-destructive" : ""}>Adresse complète</Label>
+                    <Input
+                      id="adresse_complete"
+                      value={formData.adresse_complete}
+                      onChange={(e) => setFormData({ ...formData, adresse_complete: e.target.value })}
+                      className={errors.adresse_complete ? "border-destructive" : ""}
+                    />
+                    {errors.adresse_complete && <p className="text-xs text-destructive mt-1">{errors.adresse_complete[0]}</p>}
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="coordonnees_gps" className={errors.coordonnees_gps ? "text-destructive" : ""}>Coordonnées GPS (Google Maps)</Label>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        id="coordonnees_gps"
+                        value={formData.coordonnees_gps}
+                        onChange={(e) => setFormData({ ...formData, coordonnees_gps: e.target.value })}
+                        placeholder="Ex: 33.5731, -7.5898"
+                        className={`flex-1 ${errors.coordonnees_gps ? "border-destructive" : ""}`}
+                      />
+                      <Button type="button" size="icon" onClick={openMap} title="Choisir sur la carte" className="shrink-0 bg-red-500 hover:bg-red-600 text-white">
+                        <MapIcon className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
+                    {errors.coordonnees_gps && <p className="text-xs text-destructive mt-1">{errors.coordonnees_gps[0]}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="immeuble" className={errors.immeuble ? "text-destructive" : ""}>Immeuble</Label>
+                    <Input
+                      id="immeuble"
+                      value={formData.immeuble}
+                      onChange={(e) => setFormData({ ...formData, immeuble: e.target.value })}
+                      className={errors.immeuble ? "border-destructive" : ""}
+                    />
+                    {errors.immeuble && <p className="text-xs text-destructive mt-1">{errors.immeuble[0]}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="bloc" className={errors.bloc ? "text-destructive" : ""}>Bloc</Label>
+                    <Input
+                      id="bloc"
+                      value={formData.bloc}
+                      onChange={(e) => setFormData({ ...formData, bloc: e.target.value })}
+                      className={errors.bloc ? "border-destructive" : ""}
+                    />
+                    {errors.bloc && <p className="text-xs text-destructive mt-1">{errors.bloc[0]}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="etage" className={errors.etage ? "text-destructive" : ""}>Étage</Label>
+                      <Input
+                        id="etage"
+                        value={formData.etage}
+                        onChange={(e) => setFormData({ ...formData, etage: e.target.value })}
+                        className={errors.etage ? "border-destructive" : ""}
+                      />
+                      {errors.etage && <p className="text-xs text-destructive mt-1">{errors.etage[0]}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="nb_appartements" className={errors.nb_appartements ? "text-destructive" : ""}>N° appartement</Label>
+                      <Input
+                        id="nb_appartements"
+                        type="number"
+                        onWheel={(e) => e.target.blur()}
+                        value={formData.nb_appartements}
+                        onChange={(e) => setFormData({ ...formData, nb_appartements: e.target.value })}
+                        className={errors.nb_appartements ? "border-destructive" : ""}
+                      />
+                      {errors.nb_appartements && <p className="text-xs text-destructive mt-1">{errors.nb_appartements[0]}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="superficie_m2" className={errors.superficie_m2 ? "text-destructive" : ""}>Surface (m²)</Label>
+                      <Input
+                        id="superficie_m2"
+                        type="number"
+                        onWheel={(e) => e.target.blur()}
+                        value={formData.superficie_m2}
+                        onChange={(e) => setFormData({ ...formData, superficie_m2: e.target.value })}
+                        className={errors.superficie_m2 ? "border-destructive" : ""}
+                      />
+                      {errors.superficie_m2 && <p className="text-xs text-destructive mt-1">{errors.superficie_m2[0]}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="nb_pieces" className={errors.nb_pieces ? "text-destructive" : ""}>Nb Pièces</Label>
+                      <Input
+                        id="nb_pieces"
+                        type="number"
+                        onWheel={(e) => e.target.blur()}
+                        value={formData.nb_pieces}
+                        onChange={(e) => setFormData({ ...formData, nb_pieces: e.target.value })}
+                        className={errors.nb_pieces ? "border-destructive" : ""}
+                      />
+                      {errors.nb_pieces && <p className="text-xs text-destructive mt-1">{errors.nb_pieces[0]}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="nb_sdb" className={errors.nb_sdb ? "text-destructive" : ""}>Nb SDB</Label>
+                      <Input
+                        id="nb_sdb"
+                        type="number"
+                        onWheel={(e) => e.target.blur()}
+                        value={formData.nb_sdb}
+                        onChange={(e) => setFormData({ ...formData, nb_sdb: e.target.value })}
+                        className={errors.nb_sdb ? "border-destructive" : ""}
+                      />
+                      {errors.nb_sdb && <p className="text-xs text-destructive mt-1">{errors.nb_sdb[0]}</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="statut" className={errors.statut ? "text-destructive" : ""}>Statut</Label>
+                    <Select
+                      value={formData.statut}
+                      onValueChange={(value) => setFormData({ ...formData, statut: value })}
+                    >
+                      <SelectTrigger id="statut" className={errors.statut ? "border-destructive" : ""}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isCommercial ? (
+                          <>
+                            <SelectItem value="en_negociation">En négociation</SelectItem>
+                            <SelectItem value="negociation_echouee">Négociation échouée</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value="vacant">Vacant</SelectItem>
+                            <SelectItem value="loue">Loué</SelectItem>
+                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                            <SelectItem value="reserve">Réservé</SelectItem>
+                            <SelectItem value="en_negociation">En négociation</SelectItem>
+                            <SelectItem value="negociation_echouee">Négociation échouée</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {errors.statut && <p className="text-xs text-destructive mt-1">{errors.statut[0]}</p>}
+                  </div>
                 </div>
-              </div>
-            </div>
+              </TabsContent>
+
+              <TabsContent value="gestion" className="space-y-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="description_bien" className={errors.description_bien ? "text-destructive" : ""}>Description du bien</Label>
+                    <Textarea
+                      id="description_bien"
+                      value={formData.description_bien}
+                      onChange={(e) => setFormData({ ...formData, description_bien: e.target.value })}
+                      placeholder="Description détaillée du bien..."
+                      className={`h-20 ${errors.description_bien ? "border-destructive" : ""}`}
+                    />
+                    {errors.description_bien && <p className="text-xs text-destructive mt-1">{errors.description_bien[0]}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="taux_gestion_pct" className={errors.taux_gestion_pct ? "text-destructive" : ""}>Taux de gestion (%)</Label>
+                    <Input
+                      id="taux_gestion_pct"
+                      type="number"
+                      step="0.01"
+                      value={formData.taux_gestion_pct}
+                      onChange={(e) => setFormData({ ...formData, taux_gestion_pct: e.target.value })}
+                      className={errors.taux_gestion_pct ? "border-destructive" : ""}
+                    />
+                    {errors.taux_gestion_pct && <p className="text-xs text-destructive mt-1">{errors.taux_gestion_pct[0]}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="frais_min_mensuel" className={errors.frais_min_mensuel ? "text-destructive" : ""}>Frais min. mensuel</Label>
+                    <Input
+                      id="frais_min_mensuel"
+                      type="number"
+                      step="0.01"
+                      value={formData.frais_min_mensuel}
+                      onChange={(e) => setFormData({ ...formData, frais_min_mensuel: e.target.value })}
+                      className={errors.frais_min_mensuel ? "border-destructive" : ""}
+                    />
+                    {errors.frais_min_mensuel && <p className="text-xs text-destructive mt-1">{errors.frais_min_mensuel[0]}</p>}
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label htmlFor="pouvoirs_accordes" className={errors.pouvoirs_accordes ? "text-destructive" : ""}>Pouvoirs accordés</Label>
+                    <Textarea
+                      id="pouvoirs_accordes"
+                      value={formData.pouvoirs_accordes}
+                      onChange={(e) => setFormData({ ...formData, pouvoirs_accordes: e.target.value })}
+                      placeholder="Liste des pouvoirs accordés..."
+                      className={`h-20 ${errors.pouvoirs_accordes ? "border-destructive" : ""}`}
+                    />
+                    {errors.pouvoirs_accordes && <p className="text-xs text-destructive mt-1">{errors.pouvoirs_accordes[0]}</p>}
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
 
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={() => setShowFormModal(false)} className="w-full md:w-1/2">
@@ -974,31 +1008,6 @@ export default function UnitesShadcn() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Mandat Creation Prompt Dialog */}
-      <AlertDialog open={showMandatModal} onOpenChange={setShowMandatModal}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Créer un mandat de gestion ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Vous avez associé des propriétaires à cette unité. Voulez-vous créer un mandat de gestion maintenant ?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowMandatModal(false)}>Plus tard</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-                setShowMandatModal(false);
-                navigate('/mandats/nouveau', { 
-                    state: { 
-                        uniteId: createdUniteId
-                    } 
-                });
-            }}>
-              Créer le mandat
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

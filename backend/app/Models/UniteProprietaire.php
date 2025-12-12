@@ -13,24 +13,21 @@ class UniteProprietaire extends Model
 
     protected $fillable = [
         'unite_id',
-        'mandat_id',
         'proprietaire_id',
         'part_numerateur',
         'part_denominateur',
+        'pourcentage',
         'date_debut',
         'date_fin',
-        'statut',
     ];
 
     protected $casts = [
-        'date_debut' => 'date',
-        'date_fin' => 'date',
-        'part_pourcent' => 'decimal:4',
+        'pourcentage' => 'decimal:2',
     ];
 
     public function unite()
     {
-        return $this->belongsTo(Unite::class);
+        return $this->belongsTo(Unite::class, 'unite_id');
     }
 
     public function proprietaire()

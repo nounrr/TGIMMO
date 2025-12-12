@@ -10,9 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Users as UsersIcon, CalendarDays, Plus, Trash2 } from 'lucide-react';
+import Select from 'react-select';
 
 export default function UniteOwners() {
-  const { can } = useAuthz();
+  const { can, hasRole } = useAuthz();
   const { uniteId } = useParams();
   const navigate = useNavigate();
   const { data: ownersListData } = useGetProprietairesQuery();
@@ -34,6 +35,13 @@ export default function UniteOwners() {
     const map = {};
     for (const p of proprietaires) map[p.id] = p;
     return map;
+  }, [proprietaires]);
+
+  const ownerOptions = useMemo(() => {
+    return proprietaires.map(p => ({
+      value: p.id,
+      label: p.nom_raison || p.email || `#${p.id}`
+    }));
   }, [proprietaires]);
 
   const activeGroup = useMemo(() => {
@@ -154,11 +162,25 @@ export default function UniteOwners() {
        }
     }
 
+    // Determine default status based on permissions
+    // Priority: actif > en_validation > brouillon
+    let defaultStatus = 'en_validation';
+    if (can('mandats.status.create.brouillon')) {
+        defaultStatus = 'brouillon';
+    }
+    if (can('mandats.status.create.en_validation')) {
+        defaultStatus = 'en_validation';
+    }
+    if (can('mandats.status.create.actif')) {
+        defaultStatus = 'actif';
+    }
+
     const payload = {
       unite_id: Number(uniteId),
       date_debut: dateDebut,
       original_date_debut: originalDateDebut,
       date_fin: dateFin || null,
+      statut: defaultStatus,
       owners: cleanRows.map(r => ({
         id: r.id ?? null,
         proprietaire_id: Number(r.proprietaire_id),
@@ -170,7 +192,6 @@ export default function UniteOwners() {
     try {
       // Logic for mandate update / avenant creation
       // We look for a mandate that overlaps with the period [dateDebut, dateFin]
-      // This handles both "Editing" (finding the mandate we are editing) and "New" (checking if we should attach to existing)
       
       let matchingMandat = null;
       if (editingMandatId) {
@@ -189,73 +210,31 @@ export default function UniteOwners() {
         });
       }
 
-      // If we're editing the active period, always perform a direct sync update
-      if (isEditingActive) {
-        // On edit, branch by mandat status: active -> avenant flow; otherwise -> mandat edit flow
-        if (matchingMandat && ['actif','signe'].includes(matchingMandat.statut)) {
-          const extendedPayload = {
-            ...payload,
-            mandat_id: matchingMandat.id,
-            apply_modifier_status: true,
-          };
-          setPendingPayload(extendedPayload);
-          setWizardMode('avenant');
-          setActiveMandatId(matchingMandat.id);
-          setShowManualWizard(true);
-        } else if (matchingMandat) {
-          const payloadWithMandat = { ...payload, mandat_id: matchingMandat.id };
-          setPendingPayload(payloadWithMandat);
-          setWizardMode('mandat');
-          setActiveMandatId(matchingMandat.id);
-          setShowManualWizard(true);
-        } else {
-          // No mandat found, default to mandat creation flow
-          setPendingPayload(payload);
-          setWizardMode('mandat');
-          setShowManualWizard(true);
-        }
-      } else if (matchingMandat) {
+      const finalPayload = { ...payload };
+      
+      if (matchingMandat) {
+          finalPayload.mandat_id = matchingMandat.id;
+          // If mandate is active/signed, trigger versioning (avenant logic in backend)
           if (['actif', 'signe'].includes(matchingMandat.statut)) {
-            // Mandat validated -> Create Avenant -> Wizard
-            const extendedPayload = {
-                ...payload,
-                mandat_id: matchingMandat.id,
-                apply_modifier_status: true
-            };
-            setPendingPayload(extendedPayload);
-            setWizardMode('avenant');
-            setActiveMandatId(matchingMandat.id);
-            setShowManualWizard(true);
-          } else {
-            // Mandat draft/validation -> Update Mandat directly
-            const payloadWithMandat = { ...payload, mandat_id: matchingMandat.id };
-            await saveGroup({ uniteId, payload: payloadWithMandat }).unwrap();
-            
-            const updatePayload = {
-              date_debut: dateDebut,
-              date_fin: dateFin || matchingMandat.date_fin,
-            };
-            if (cleanRows.length === 1) {
-              updatePayload.proprietaire_id = Number(cleanRows[0].proprietaire_id);
-            }
-            await updateMandat({ id: matchingMandat.id, payload: updatePayload }).unwrap();
-            refetch();
+              finalPayload.apply_modifier_status = true;
           }
-      } else {
-        // New period -> Create Mandat -> Wizard
-        setPendingPayload(payload);
-        setWizardMode('mandat');
-        setShowManualWizard(true);
       }
+
+      // Direct save without wizard
+      await saveGroup({ uniteId, payload: finalPayload }).unwrap();
+      
+      // Reset form
+      setRows([{ proprietaire_id: '', part_numerateur: 1, part_denominateur: 1 }]);
+      setDateDebut(''); 
+      setDateFin(''); 
+      setSubmitError(null); 
+      setIsEditingActive(false); 
+      setEditingMandatId(null);
+      refetch();
+
     } catch (err) {
       setSubmitError(err?.data?.message || err?.message || 'Erreur inconnue');
     }
-  };
-
-  const handleBeforeSaveMandate = async () => {
-    if (!pendingPayload) return;
-    await saveGroup({ uniteId, payload: pendingPayload }).unwrap();
-    refetch();
   };
 
   const startEditMandatStatus = (mandat) => {
@@ -302,6 +281,12 @@ export default function UniteOwners() {
     setEditingMandatId(groupToLoad.mandat_id || null);
   };
 
+  useEffect(() => {
+    if (activeGroup) {
+      loadActive(activeGroup);
+    }
+  }, [activeGroup]);
+
   const ownersForWizard = useMemo(() => {
     return rows.filter(r => r.proprietaire_id).map(r => {
       const p = ownersById[r.proprietaire_id];
@@ -342,261 +327,7 @@ export default function UniteOwners() {
         <span className="text-sm text-slate-500">Unité #{uniteId}</span>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-lg">Historique des périodes</CardTitle></CardHeader>
-        <CardContent>
-          {isFetching ? (
-            <div className="py-6 text-center text-slate-500">Chargement…</div>
-          ) : (groups || []).length === 0 ? (
-            <div className="py-6 text-center text-slate-500">Aucune période enregistrée</div>
-          ) : (
-            <div className="border rounded-md overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50">
-                    <TableHead>Début</TableHead>
-                    <TableHead>Fin</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Propriétaires et parts</TableHead>
-                    <TableHead>Mandat</TableHead>
-                    <TableHead>Avenant</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(groups || []).map((g, idx) => {
-                    let matchingMandat = mandats.find(m => {
-                        if (m.statut === 'annule') return false;
-                        const mStart = m.date_debut;
-                        const mEnd = m.date_fin || '9999-12-31';
-                        const gStart = g.date_debut;
-                        const gEnd = g.date_fin || '9999-12-31';
-                        return (mEnd >= gStart && gEnd >= mStart);
-                    });
-                    // Use explicit mandat_id from group if available
-                    const groupMandatId = g.mandat_id || matchingMandat?.id || null;
-                    if (!matchingMandat && groupMandatId) {
-                      matchingMandat = mandats.find(m => m.id === groupMandatId);
-                    }
-                    // Find avenant for this mandat: prefer same-period start, else latest by date
-                    let matchingAvenant = null;
-                    if (groupMandatId) {
-                      const avenantsForMandat = avenants.filter(a => a.mandat_id === groupMandatId);
-                      if (avenantsForMandat.length > 0) {
-                        matchingAvenant = avenantsForMandat.find(a => {
-                          const aStart = a.date_effet || a.date_debut || a.date_pouvoir_initial;
-                          return aStart && aStart === g.date_debut;
-                        }) || [...avenantsForMandat].sort((a,b) => {
-                          const getDate = (x) => x.date_effet || x.date_debut || x.date_pouvoir_initial || '0000-00-00';
-                          return getDate(b).localeCompare(getDate(a));
-                        })[0];
-                      }
-                    } else {
-                      // Fallback: original behavior based on period start
-                      matchingAvenant = avenants.find(a => {
-                        const aStart = a.date_effet || a.date_debut || a.date_pouvoir_initial;
-                        return aStart && aStart === g.date_debut;
-                      });
-                    }
-                    // Fallback: if avenant found but mandat not matched by overlap, fetch its mandat directly
-                    if (!matchingMandat && matchingAvenant) {
-                      matchingMandat = mandats.find(m => m.id === matchingAvenant.mandat_id);
-                    }
-                    return (
-                    <TableRow key={idx}>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-0 flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3" /> {g.date_debut}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {g.date_fin ? (
-                          <Badge variant="outline" className="bg-red-100 text-red-700 border-0 flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3" /> {g.date_fin}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {g.statut === 'modifier' ? (
-                              <Badge variant="outline" className="bg-amber-100 text-amber-700 border-0">Modifier</Badge>
-                          ) : (
-                              <Badge variant="outline" className="bg-green-100 text-green-700 border-0">Actif</Badge>
-                          )}
-                          {can('unites-proprietaires.status.modifier') && (
-                            statusEditGroupKey === `${g.date_debut}|${g.statut || 'actif'}` ? (
-                              <div className="flex items-center gap-1">
-                                <select
-                                  className="text-xs bg-white border border-slate-300 rounded px-1 py-0.5"
-                                  value={statusEditGroupValue}
-                                  onChange={(e)=>setStatusEditGroupValue(e.target.value)}
-                                >
-                                  <option value="actif">actif</option>
-                                  <option value="modifier">modifier</option>
-                                </select>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-emerald-600"
-                                  title="Enregistrer"
-                                  onClick={async () => {
-                                    try {
-                                      await updateOwnershipStatus({
-                                        uniteId,
-                                        payload: {
-                                          date_debut: g.date_debut,
-                                          current_statut: g.statut || 'actif',
-                                          new_statut: statusEditGroupValue,
-                                        }
-                                      }).unwrap();
-                                      setStatusEditGroupKey(null);
-                                      refetch();
-                                    } catch (e) {
-                                      console.error(e);
-                                      setSubmitError(e?.data?.message || e?.message || 'Erreur mise à jour du statut de la période');
-                                    }
-                                  }}
-                                >
-                                  <i className="bi bi-check-lg"></i>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-red-600"
-                                  title="Annuler"
-                                  onClick={() => setStatusEditGroupKey(null)}
-                                >
-                                  <i className="bi bi-x-lg"></i>
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                title="Modifier le statut de la période"
-                                onClick={() => { setStatusEditGroupKey(`${g.date_debut}|${g.statut || 'actif'}`); setStatusEditGroupValue(g.statut || 'actif'); }}
-                              >
-                                <i className="bi bi-pencil-square text-slate-600"></i>
-                              </Button>
-                            )
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {(g.owners || []).map((o, i) => {
-                            const p = ownersById[o.proprietaire_id];
-                            const label = p?.nom_raison || p?.email || `#${o.proprietaire_id}`;
-                            const pct = typeof o.part_pourcent === 'number' ? o.part_pourcent.toFixed(2) : o.part_pourcent;
-                            return (
-                              <Badge key={i} variant="outline" className="bg-emerald-100 text-emerald-700 border-0">
-                                {label}: {o.part_numerateur}/{o.part_denominateur} ({pct}%)
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {matchingMandat ? (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge
-                              variant="outline"
-                              className={
-                                matchingMandat.statut === 'brouillon'
-                                  ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                  : ['actif','signe'].includes(matchingMandat.statut)
-                                    ? 'bg-purple-100 text-purple-700 border-0'
-                                    : 'bg-slate-100 text-slate-700 border-0'
-                              }
-                            >
-                              Mandat #{matchingMandat.numero_mandat || matchingMandat.id} ({matchingMandat.statut})
-                            </Badge>
-                            {!['actif','resilie'].includes(matchingMandat.statut) && statusEditMandatId === matchingMandat.id && (
-                              <div className="flex items-center gap-1">
-                                <select
-                                  className="text-xs bg-white border border-slate-300 rounded px-1 py-0.5"
-                                  value={statusEditValue}
-                                  onChange={(e)=>setStatusEditValue(e.target.value)}
-                                >
-                                  <option value="brouillon">brouillon</option>
-                                  <option value="en_validation">en_validation</option>
-                                  <option value="signe">signe</option>
-                                  <option value="actif">actif</option>
-                                  <option value="resilie">resilie</option>
-                                </select>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-emerald-600"
-                                  title="Enregistrer"
-                                  onClick={() => saveMandatStatus(matchingMandat)}
-                                >
-                                  <i className="bi bi-check-lg"></i>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0 text-red-600"
-                                  title="Annuler"
-                                  onClick={() => setStatusEditMandatId(null)}
-                                >
-                                  <i className="bi bi-x-lg"></i>
-                                </Button>
-                              </div>
-                            )}
-                            {!['actif','resilie'].includes(matchingMandat.statut) && statusEditMandatId !== matchingMandat.id && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                title="Modifier le statut du mandat"
-                                onClick={() => startEditMandatStatus(matchingMandat)}
-                              >
-                                <i className="bi bi-pencil-square text-slate-600"></i>
-                              </Button>
-                            )}
-                          </div>
-                        ) : <span className="text-muted-foreground">-</span>}
-                      </TableCell>
-                      <TableCell>
-                        {matchingAvenant ? (
-                          <Badge
-                            variant="outline"
-                            className={
-                              matchingAvenant.statut === 'brouillon'
-                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                : ['actif','signe'].includes(matchingAvenant.statut)
-                                  ? 'bg-amber-100 text-amber-700 border-0'
-                                  : 'bg-slate-100 text-slate-700 border-0'
-                            }
-                          >
-                            Avenant #{matchingAvenant.id} ({matchingAvenant.statut})
-                          </Badge>
-                        ) : <span className="text-muted-foreground">-</span>}
-                      </TableCell>
-                      <TableCell>
-                        {g.statut === 'actif' && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              title="Modifier cette période"
-                              onClick={() => loadActive(g)}
-                            >
-                                <i className="bi bi-pencil text-blue-600"></i>
-                            </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )})}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-lg">Ajouter / Remplacer une période</CardTitle></CardHeader>
@@ -609,12 +340,12 @@ export default function UniteOwners() {
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Date début *</label>
-                <Input type="date" value={dateDebut} onChange={(e)=>setDateDebut(e.target.value)} required />
+                <label className="text-sm font-medium">Date début</label>
+                <Input type="date" value={dateDebut} onChange={(e)=>setDateDebut(e.target.value)} />
               </div>
               <div>
-                <label className="text-sm font-medium">Date fin *</label>
-                <Input type="date" value={dateFin} onChange={(e)=>setDateFin(e.target.value)} required />
+                <label className="text-sm font-medium">Date fin</label>
+                <Input type="date" value={dateFin} onChange={(e)=>setDateFin(e.target.value)} />
               </div>
             </div>
             <div className="border rounded-md">
@@ -637,25 +368,23 @@ export default function UniteOwners() {
                     return (
                       <TableRow key={idx}>
                         <TableCell>
-                          <select
-                            className="text-sm bg-white border border-slate-200 rounded-md px-2 py-1 w-56"
-                            value={r.proprietaire_id}
-                            onChange={(e)=>updateRow(idx,{ proprietaire_id: e.target.value })}
-                            required
-                          >
-                            <option value="">Choisir…</option>
-                            {proprietaires.map(p => (
-                              <option key={p.id} value={p.id}>{p.nom_raison || p.email || `#${p.id}`}</option>
-                            ))}
-                          </select>
+                          <Select
+                            options={ownerOptions}
+                            value={ownerOptions.find(opt => opt.value === Number(r.proprietaire_id)) || null}
+                            onChange={(opt) => updateRow(idx, { proprietaire_id: opt ? opt.value : '' })}
+                            placeholder="Choisir..."
+                            className="w-64 text-sm"
+                            menuPortalTarget={document.body}
+                            styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                          />
                         </TableCell>
                         <TableCell>
-                          <Input type="number" min={1} value={r.part_numerateur}
+                          <Input type="number" onWheel={(e) => e.target.blur()} min={1} value={r.part_numerateur}
                                  onChange={(e)=>updateRow(idx,{ part_numerateur: e.target.value })}
                                  className={hasError ? 'border-red-500' : ''} />
                         </TableCell>
                         <TableCell>
-                          <Input type="number" min={1} value={r.part_denominateur}
+                          <Input type="number" onWheel={(e) => e.target.blur()} min={1} value={r.part_denominateur}
                                  onChange={(e)=>updateRow(idx,{ part_denominateur: e.target.value })}
                                  className={hasError ? 'border-red-500' : ''} />
                         </TableCell>
@@ -736,8 +465,8 @@ export default function UniteOwners() {
         lockCoreFields={true}
         editMandatId={wizardMode === 'mandat' ? activeMandatId : undefined}
         unitOwners={ownersForWizard}
+        ownerships={rows}
         uniteId={uniteId}
-        onBeforeSave={handleBeforeSaveMandate}
         requireAvenantFirst={wizardMode === 'avenant'}
       />
     </div>

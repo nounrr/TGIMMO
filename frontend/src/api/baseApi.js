@@ -10,8 +10,56 @@ export const baseApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['User', 'Users', 'Role', 'Permission', 'Locataire', 'Proprietaire', 'Unite', 'Prestataire', 'UniteOwnerships', 'Mandat', 'Avenant', 'Bail', 'BailCharges', 'RemiseCle', 'Reclamation', 'ReclamationType', 'JustificationReclamation', 'Intervention', 'Devis', 'Facture', 'Ged', 'ApprocheProprietaire', 'ApprocheLocataire', 'Paiement', 'ImputationCharge', 'Liquidation'],
+  tagTypes: ['User', 'Users', 'Role', 'Permission', 'Locataire', 'Proprietaire', 'Unite', 'Prestataire', 'UniteOwnerships', 'Mandat', 'Avenant', 'Bail', 'BailCharges', 'RemiseCle', 'Reclamation', 'ReclamationType', 'JustificationReclamation', 'Intervention', 'Devis', 'Facture', 'Ged', 'GedDocument', 'ApprocheProprietaire', 'ApprocheLocataire', 'Paiement', 'ImputationCharge', 'Liquidation'],
   endpoints: (builder) => ({
+    // Mandat editor (template + preview)
+    getMandatEditorTemplate: builder.query({
+      query: (id) => ({ url: `mandats-gestion/${id}/editor-template` }),
+      providesTags: (_res, _err, id) => [{ type: 'Mandat', id }],
+    }),
+    renderMandatPreview: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `mandats-gestion/${id}/render-preview`,
+        method: 'POST',
+        body: payload,
+      }),
+    }),
+    // Bail editor (template + preview)
+    getBailEditorTemplate: builder.query({
+      query: (id) => ({ url: `baux/${id}/editor-template` }),
+      providesTags: (_res, _err, id) => [{ type: 'Bail', id }],
+    }),
+    renderBailPreview: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `baux/${id}/render-preview`,
+        method: 'POST',
+        body: payload,
+      }),
+    }),
+    // Bail Resiliation editor
+    getBailResiliationTemplate: builder.query({
+      query: (id) => ({ url: `baux/${id}/resiliation-template` }),
+      providesTags: (_res, _err, id) => [{ type: 'Bail', id }],
+    }),
+    renderBailResiliationPreview: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `baux/${id}/render-resiliation-preview`,
+        method: 'POST',
+        body: payload,
+      }),
+    }),
+    // Remise Cle editor
+    getRemiseCleEditorTemplate: builder.query({
+      query: (id) => ({ url: `remises-cles/${id}/editor-template` }),
+      providesTags: (_res, _err, id) => [{ type: 'RemiseCle', id }],
+    }),
+    renderRemiseClePreview: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `remises-cles/${id}/render-preview`,
+        method: 'POST',
+        body: payload,
+      }),
+    }),
     // Liquidations
     getLiquidations: builder.query({
       query: (params) => ({ url: 'liquidations', params }),
@@ -200,6 +248,17 @@ export const baseApi = createApi({
       query: (bailId) => ({ url: `baux/${bailId}/paiements` }),
       providesTags: (result, _err, bailId) => result?.data ? [ { type: 'Bail', id: bailId }, ...result.data.map(p => ({ type: 'Paiement', id: p.id })) ] : [{ type: 'Bail', id: bailId }],
     }),
+    getAllBauxWithPaiements: builder.query({
+      query: () => ({ url: 'paiements/all-baux' }),
+      providesTags: (result) => result?.data ? [
+        { type: 'Bail', id: 'LIST' },
+        { type: 'Paiement', id: 'LIST' },
+        ...result.data.flatMap(bail => [
+          { type: 'Bail', id: bail.id },
+          ...bail.paiements.map(p => ({ type: 'Paiement', id: p.id }))
+        ])
+      ] : [{ type: 'Bail', id: 'LIST' }, { type: 'Paiement', id: 'LIST' }],
+    }),
     createBailPaiement: builder.mutation({
       query: ({ bailId, payload }) => ({ url: `baux/${bailId}/paiements`, method: 'POST', body: payload }),
       invalidatesTags: (_res, _err, arg) => [{ type: 'Bail', id: arg.bailId }, { type: 'Paiement', id: 'LIST' }],
@@ -259,6 +318,14 @@ export const baseApi = createApi({
     getAllRemisesCles: builder.query({
       query: (params) => ({ url: 'remises-cles', params }),
       providesTags: (result) => result?.data ? result.data.map(r => ({ type: 'RemiseCle', id: r.id })) : [{ type: 'RemiseCle' }],
+    }),
+    updateRemiseCle: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `remises-cles/${id}`,
+        method: 'PUT',
+        body: payload,
+      }),
+      invalidatesTags: (_res, _err, arg) => [{ type: 'RemiseCle', id: arg.id }, { type: 'Bail' }],
     }),
 
     // Reclamation Types
@@ -333,6 +400,42 @@ export const baseApi = createApi({
     deleteReclamationJustif: builder.mutation({
       query: ({ id, justifId }) => ({ url: `reclamations/${id}/justifications/${justifId}`, method: 'DELETE' }),
       invalidatesTags: (_res,_err,arg) => [{ type: 'Reclamation', id: arg.id }],
+    }),
+
+    // Franchises Bail
+    getBailFranchises: builder.query({
+      query: (bailId) => ({ url: `baux/${bailId}/franchises` }),
+      providesTags: (_res, _err, bailId) => [{ type: 'Bail', id: bailId }, 'Bail'],
+    }),
+    createFranchise: builder.mutation({
+      query: (payload) => ({
+        url: 'franchises',
+        method: 'POST',
+        body: payload,
+      }),
+      invalidatesTags: (_res, _err, arg) => [{ type: 'Bail', id: arg.bail_id }, 'Bail'],
+    }),
+    updateFranchise: builder.mutation({
+      query: ({ id, payload }) => ({
+        url: `franchises/${id}`,
+        method: 'PATCH',
+        body: payload,
+      }),
+      invalidatesTags: (_res, _err, arg) => [{ type: 'Bail', id: arg.payload.bail_id }, 'Bail'],
+    }),
+    deleteFranchise: builder.mutation({
+      query: (id) => ({
+        url: `franchises/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Bail'],
+    }),
+    calculerLoyerAvecFranchise: builder.mutation({
+      query: ({ bailId, date }) => ({
+        url: `baux/${bailId}/calculer-loyer`,
+        method: 'POST',
+        body: { date },
+      }),
     }),
 
     // Interventions
@@ -549,17 +652,23 @@ export const {
   useGetMandatQuery, 
   useCreateMandatMutation, 
   useUpdateMandatMutation, 
+  useGetMandatEditorTemplateQuery,
+  useRenderMandatPreviewMutation,
   useGetAvenantsQuery, 
   useGetAvenantQuery, 
   useCreateAvenantMutation, 
   useUpdateAvenantMutation, 
   useGetBauxQuery, 
   useGetBailQuery, 
+  useLazyGetBailQuery,
   useCreateBailMutation, 
   useUpdateBailMutation, 
   useDeleteBailMutation, 
   useGetRemisesClesQuery, 
   useCreateRemiseCleMutation, 
+  useUpdateRemiseCleMutation,
+  useGetRemiseCleEditorTemplateQuery,
+  useRenderRemiseClePreviewMutation,
   useGetAllRemisesClesQuery, 
   useGetReclamationTypesQuery, 
   useCreateReclamationTypeMutation, 
@@ -572,6 +681,11 @@ export const {
   useDeleteReclamationMutation, 
   useUploadReclamationJustifsMutation, 
   useDeleteReclamationJustifMutation, 
+  useGetBailFranchisesQuery,
+  useCreateFranchiseMutation,
+  useUpdateFranchiseMutation,
+  useDeleteFranchiseMutation,
+  useCalculerLoyerAvecFranchiseMutation,
   useGetInterventionNaturesQuery,
   useGetInterventionsQuery, 
   useGetInterventionQuery, 
@@ -600,7 +714,8 @@ export const {
   useCreateApprocheLocataireMutation, 
   useUpdateApprocheLocataireMutation, 
   useDeleteApprocheLocataireMutation, 
-  useGetBailPaiementsQuery, 
+  useGetBailPaiementsQuery,
+  useGetAllBauxWithPaiementsQuery,
   useCreateBailPaiementMutation, 
   useUpdatePaiementMutation, 
   useValiderPaiementMutation,
@@ -616,4 +731,8 @@ export const {
   useGetPendingLiquidationsQuery,
   usePreviewLiquidationMutation,
   useCreateLiquidationMutation,
+  useGetBailEditorTemplateQuery,
+  useRenderBailPreviewMutation,
+  useGetBailResiliationTemplateQuery,
+  useRenderBailResiliationPreviewMutation,
 } = baseApi;

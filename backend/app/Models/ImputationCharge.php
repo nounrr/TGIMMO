@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasDocuments;
 
 class ImputationCharge extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDocuments;
 
     public const IMPUTE_VALUES = ['bail','unite','intervention','reclamation','locataire','proprietaire','charge_libre'];
     public const PAYER_TYPES = ['locataire','proprietaire','societe'];

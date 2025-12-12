@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Proprietaire;
 use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProprietaireController extends Controller
 {
@@ -37,7 +38,7 @@ class ProprietaireController extends Controller
             });
         }
         
-        if ($type = $request->query('type')) {
+        if ($type = $request->query('type_proprietaire')) {
             $query->where('type_proprietaire', $type);
         }
         
@@ -45,15 +46,6 @@ class ProprietaireController extends Controller
             $query->where('statut', $statut);
         }
 
-        if ($sortBy = $request->query('sort_by')) {
-            $direction = $request->query('order', 'asc');
-            if (in_array($sortBy, ['created_at', 'updated_at', 'nom_raison', 'cin', 'email'])) {
-                $query->orderBy($sortBy, $direction);
-            }
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
-        
         // Statistiques globales (indépendantes des filtres)
         $stats = [
             'total' => Proprietaire::count(),
@@ -66,7 +58,7 @@ class ProprietaireController extends Controller
         // Tri
         $sortBy = $request->query('sort_by');
         $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $allowedSorts = ['nom_raison', 'type_proprietaire', 'statut', 'email', 'telephone', 'created_at'];
+        $allowedSorts = ['nom_raison', 'type_proprietaire', 'statut', 'email', 'telephone', 'created_at', 'updated_at'];
         if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
             $query->orderBy($sortBy, $sortDir);
         } else {
@@ -94,7 +86,7 @@ class ProprietaireController extends Controller
 
     public function update(Request $request, Proprietaire $proprietaire)
     {
-        $data = $this->validatedData($request, false);
+        $data = $this->validatedData($request, false, $proprietaire->id);
         $proprietaire->update($data);
         return response()->json($proprietaire);
     }
@@ -105,7 +97,7 @@ class ProprietaireController extends Controller
         return response()->json(null, 204);
     }
 
-    private function validatedData(Request $request, bool $creating): array
+    private function validatedData(Request $request, bool $creating, ?int $id = null): array
     {
         $user = $request->user();
         $isCommercial = $user && $user->hasRole('commercial');
@@ -117,19 +109,24 @@ class ProprietaireController extends Controller
             'prenom_ar' => ['nullable', 'string', 'max:200'],
             'type_proprietaire' => ['nullable', 'in:unique,coproprietaire,heritier,sci,autre'],
             'statut' => ['nullable', 'string'],
-            'telephone' => ['nullable', 'string', 'max:20'],
+            'telephone' => ['nullable', 'array'],
+            'telephone.*' => ['string', 'regex:/^0[5-7][0-9]{8}$/'],
             'email' => ['nullable', 'email', 'max:150'],
+            'rib' => ['nullable', 'string', 'regex:/^[0-9]{24}$/'],
             'adresse' => ['nullable', 'string', 'max:255'],
             'adresse_ar' => ['nullable', 'string', 'max:255'],
-            'cin' => ['nullable', 'string', 'max:20'],
+            'ville' => ['nullable', 'string', 'max:100'],
+            'cin' => ['nullable', 'string', 'regex:/^[A-Z]{1,2}[0-9]{1,6}$/', Rule::unique('proprietaires', 'cin')->ignore($id)],
             'rc' => ['nullable', 'string', 'max:50'],
-            'ice' => ['nullable', 'string', 'max:50'],
-            'ifiscale' => ['nullable', 'string', 'max:50'],
+            'chiffre_affaires' => ['nullable', 'numeric', 'min:0'],
+            'ice' => ['nullable', 'string', 'regex:/^[0-9]{15}$/'],
+            'ifiscale' => ['nullable', 'string', 'regex:/^[0-9]{1,50}$/'],
             'representant_nom' => ['nullable', 'string', 'max:200'],
             'representant_fonction' => ['nullable', 'string', 'max:100'],
             'representant_cin' => ['nullable', 'string', 'max:20'],
-            'taux_gestion_tgi_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'part_liquidation_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'taux_gestion' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'assiette_honoraires' => ['nullable', 'string'],
+            'periodicite_releve' => ['nullable', 'string'],
             'conditions_particulieres' => ['nullable', 'string'],
         ];
 

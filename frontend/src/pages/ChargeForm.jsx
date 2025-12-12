@@ -199,6 +199,7 @@ export default function ChargeForm({ initialData, onSuccess, onCancel }) {
           <Label>Montant (MAD)</Label>
           <Input
             type="number"
+            onWheel={(e) => e.target.blur()}
             step="0.01"
             {...register('montant', { required: true })}
             placeholder="0.00"

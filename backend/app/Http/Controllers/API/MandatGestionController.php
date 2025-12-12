@@ -9,6 +9,7 @@ use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\IOFactory;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class MandatGestionController extends Controller
 {
@@ -20,42 +21,37 @@ class MandatGestionController extends Controller
         $this->middleware('permission:mandats.create')->only(['store']);
         $this->middleware('permission:mandats.update')->only(['update']);
         $this->middleware('permission:mandats.delete')->only(['destroy']);
-        $this->middleware('permission:mandats.download')->only(['downloadDocx']);
+        $this->middleware('permission:mandats.download')->only(['downloadDocx', 'downloadPdf']);
     }
 
     public function index(Request $request)
     {
-        $query = MandatGestion::query()->with(['unite']);
+        $query = MandatGestion::query()->with(['unites.proprietaires']);
 
         $this->applyStatusPermissions($query, 'mandats');
 
         if ($search = $request->query('q')) {
             $query->where(function ($q) use ($search) {
                 $q->where('reference', 'like', "%{$search}%")
-                  ->orWhere('lieu_signature', 'like', "%{$search}%");
+                  ->orWhere('mandat_id', 'like', "%{$search}%");
             });
         }
 
         if ($uniteId = $request->query('unite_id')) {
-            $query->where('unite_id', $uniteId);
+            $query->whereHas('unites', function ($q) use ($uniteId) {
+                $q->where('unites.id', $uniteId);
+            });
         }
 
         if ($statut = $request->query('statut')) {
             $query->where('statut', $statut);
         }
 
-        if ($from = $request->query('date_debut_from')) {
-            $query->whereDate('date_debut', '>=', $from);
-        }
-        if ($to = $request->query('date_debut_to')) {
-            $query->whereDate('date_debut', '<=', $to);
-        }
-
         // Tri
         $sortBy = $request->query('sort_by');
         $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $allowedSorts = ['reference', 'date_debut', 'date_fin', 'statut', 'created_at'];
-        
+        $allowedSorts = ['reference', 'mandat_id', 'date_debut', 'date_fin', 'statut', 'created_at', 'updated_at'];
+
         if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
             $query->orderBy($sortBy, $sortDir);
         } else {
@@ -70,24 +66,292 @@ class MandatGestionController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validatedData($request, true);
-        // Always set the creator from the authenticated user
+        $data = $request->validate([
+            'unite_ids' => 'required|array',
+            'unite_ids.*' => 'exists:unites,id',
+            'owners' => 'required|array',
+            'owners.*.proprietaire_id' => 'required|exists:proprietaires,id',
+            'owners.*.part_numerateur' => 'required|integer|min:1',
+            'owners.*.part_denominateur' => 'required|integer|min:1',
+            'date_debut' => 'nullable|date',
+            'date_fin' => 'nullable|date',
+            'statut' => 'required|in:actif,inactif,resilie,en_attente,signe,brouillon,modifier',
+            'reference' => 'nullable|string',
+            'mandat_id' => 'nullable|string',
+            'taux_gestion_pct' => 'nullable|numeric|min:0|max:100',
+            'doc_content' => 'nullable|string',
+            'doc_variables' => 'nullable|array',
+            'doc_template_key' => 'nullable|string|max:120',
+        ]);
+
         $data['created_by'] = $request->user()->id;
-        $mandat = MandatGestion::create($data);
-        return response()->json($mandat->load(['unite']), 201);
+        
+        // Create Mandat
+        $mandat = MandatGestion::create(\Illuminate\Support\Arr::except($data, ['unite_ids', 'owners', 'taux_gestion_pct']));
+
+        // Attach Unites
+        if (!empty($data['unite_ids'])) {
+            $mandat->unites()->sync($data['unite_ids']);
+
+            // Update taux_gestion_pct for units if provided
+            if (isset($data['taux_gestion_pct']) && $data['taux_gestion_pct'] !== null) {
+                \App\Models\Unite::whereIn('id', $data['unite_ids'])->update(['taux_gestion_pct' => $data['taux_gestion_pct']]);
+            }
+        }
+
+        // Attach Owners to each Unite
+        if (!empty($data['owners']) && !empty($data['unite_ids'])) {
+            foreach ($data['unite_ids'] as $uniteId) {
+                foreach ($data['owners'] as $owner) {
+                    \Illuminate\Support\Facades\DB::table('unites_proprietaires')->insert([
+                        'unite_id' => $uniteId,
+                        'proprietaire_id' => $owner['proprietaire_id'],
+                        'part_numerateur' => $owner['part_numerateur'],
+                        'part_denominateur' => $owner['part_denominateur'],
+                        'pourcentage' => ($owner['part_numerateur'] / $owner['part_denominateur']) * 100,
+                        'date_debut' => $mandat->date_debut,
+                        'date_fin' => $mandat->date_fin,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
+
+        return response()->json($mandat->load(['unites.proprietaires']), 201);
     }
 
     public function show(MandatGestion $mandats_gestion)
     {
-        // Route model binding will inject the record when using apiResource with parameter name
-        return response()->json($mandats_gestion->load(['unite']));
+        return response()->json($mandats_gestion->load(['unites.proprietaires']));
     }
 
     public function update(Request $request, MandatGestion $mandats_gestion)
     {
-        $data = $this->validatedData($request, false, $mandats_gestion->id);
+        $data = $request->validate([
+            'unite_ids' => 'sometimes|array',
+            'unite_ids.*' => 'exists:unites,id',
+            'owners' => 'sometimes|array',
+            'owners.*.proprietaire_id' => 'required_with:owners|exists:proprietaires,id',
+            'owners.*.part_numerateur' => 'required_with:owners|integer|min:1',
+            'owners.*.part_denominateur' => 'required_with:owners|integer|min:1',
+            'date_debut' => 'nullable|date',
+            'date_fin' => 'nullable|date',
+            'statut' => 'sometimes|in:actif,inactif,resilie,en_attente,signe,brouillon,modifier',
+            'reference' => 'nullable|string',
+            'mandat_id' => 'nullable|string',
+            'doc_content' => 'sometimes|nullable|string',
+            'doc_variables' => 'sometimes|array',
+            'doc_template_key' => 'sometimes|nullable|string|max:120',
+        ]);
+
+        // Sync Unites
+        if (array_key_exists('unite_ids', $data)) {
+             $mandats_gestion->unites()->sync($data['unite_ids']);
+             unset($data['unite_ids']);
+        }
+
+        // Sync Owners (Update logic is complex, for now we append new periods if owners change, or just update if same period?)
+        // For simplicity in this fix, we will just add new records if owners are provided, 
+        // assuming the user is defining the ownership for this mandat's period.
+        // A more robust solution would be to sync/replace for the specific period.
+        if (array_key_exists('owners', $data) && $mandats_gestion->unites->isNotEmpty()) {
+             // This part is tricky without a direct relationship. 
+             // We might want to clear existing ownerships for this period and these units?
+             // For now, let's just insert like in store, but be aware of duplicates.
+             // Ideally, we should delete existing ownerships for these units that match the mandat dates exactly.
+             
+             foreach ($mandats_gestion->unites as $unite) {
+                 // Delete existing for this exact period (simple approach)
+                 \Illuminate\Support\Facades\DB::table('unites_proprietaires')
+                    ->where('unite_id', $unite->id)
+                    ->where('date_debut', $mandats_gestion->date_debut)
+                    ->delete();
+
+                 foreach ($data['owners'] as $owner) {
+                    \Illuminate\Support\Facades\DB::table('unites_proprietaires')->insert([
+                        'unite_id' => $unite->id,
+                        'proprietaire_id' => $owner['proprietaire_id'],
+                        'part_numerateur' => $owner['part_numerateur'],
+                        'part_denominateur' => $owner['part_denominateur'],
+                        'pourcentage' => ($owner['part_numerateur'] / $owner['part_denominateur']) * 100,
+                        'date_debut' => $data['date_debut'] ?? $mandats_gestion->date_debut,
+                        'date_fin' => $data['date_fin'] ?? $mandats_gestion->date_fin,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+             }
+             unset($data['owners']);
+        }
+
+        // If doc_variables provided as array, store JSON
+        if (array_key_exists('doc_variables', $data)) {
+            $mandats_gestion->doc_variables = $data['doc_variables'];
+            unset($data['doc_variables']);
+        }
+        
         $mandats_gestion->update($data);
-        return response()->json($mandats_gestion->load(['unite']));
+
+        return response()->json($mandats_gestion->load(['unites.proprietaires']));
+    }
+
+    /**
+     * Provide default editor template and variable list for a mandat.
+     */
+    public function editorTemplate(MandatGestion $mandats_gestion, DocumentTemplateService $tpl)
+    {
+        $baseTemplate = <<<'EOT'
+<h1>Mandat de gestion</h1>
+<p>Référence: {{mandat.reference}}</p>
+<p>Unité: {{unite.numero}} (ID {{unite.id}})</p>
+<p>Période: {{mandat.date_debut}} → {{mandat.date_fin}}</p>
+<h2>Propriétaires</h2>
+{{proprietaires.liste}}
+<h2>Pouvoirs accordés</h2>
+<div>{{mandat.pouvoirs_accordes}}</div>
+<h2>Description du bien</h2>
+<div>{{mandat.description_bien}}</div>
+EOT;
+
+        $mandat = $mandats_gestion->load(['unites.proprietaires']);
+        $variables = $this->getEditorVariables($mandat);
+
+        return response()->json([
+            'template' => $baseTemplate,
+            'variables' => $variables,
+            'current' => [
+                'doc_content' => $mandat->doc_content,
+                'doc_variables' => $mandat->doc_variables,
+                'doc_template_key' => $mandat->doc_template_key,
+            ]
+        ]);
+    }
+
+    /**
+     * Render a preview of editor content with variable interpolation.
+     */
+    public function renderPreview(Request $request, MandatGestion $mandats_gestion)
+    {
+        $data = $request->validate([
+            'content' => 'required|string',
+            'variables' => 'nullable|array'
+        ]);
+
+        $mandat = $mandats_gestion->load(['unites.proprietaires']);
+        $baseVars = $this->getEditorVariables($mandat);
+        $allVars = array_merge($baseVars, $data['variables'] ?? []);
+
+        $rendered = preg_replace_callback('/{{\s*([^}]+)\s*}}/', function($m) use ($allVars) {
+            $key = trim($m[1]);
+            return array_key_exists($key, $allVars) ? ($allVars[$key] ?? '') : $m[0];
+        }, $data['content']);
+
+        return response()->json([
+            'html' => $rendered,
+            'variables_used' => array_keys($allVars)
+        ]);
+    }
+
+    /**
+     * Helper to generate all available variables for the editor.
+     * 
+     * NEW SIMPLIFIED LOGIC:
+     * - Always provide summary variables (count, liste)
+     * - Always use INDEXED variables (unite_1, proprietaire_1) regardless of count
+     * - This ensures consistent variable naming in templates
+     */
+    private function getEditorVariables(MandatGestion $mandat): array
+    {
+        $variables = [
+            // Mandat variables
+            'mandat.reference' => $mandat->reference,
+            'mandat.mandat_id' => $mandat->mandat_id,
+            'mandat.date_debut' => $mandat->date_debut?->toDateString(),
+            'mandat.date_fin' => $mandat->date_fin?->toDateString(),
+            'mandat.statut' => $mandat->statut,
+        ];
+
+        // === UNITES VARIABLES ===
+        $unitesCount = $mandat->unites->count();
+        $variables['unites.count'] = $unitesCount;
+        
+        if ($unitesCount > 0) {
+            $variables['unites.liste_numeros'] = $mandat->unites->pluck('numero_unite')->filter()->implode(', ');
+            $variables['unites.liste_adresses'] = $mandat->unites->pluck('adresse_complete')->filter()->implode('; ');
+            $variables['unites.liste_titres'] = $mandat->unites->pluck('titre_foncier')->filter()->implode(', ');
+            
+            // Always generate indexed variables for each unit
+            foreach ($mandat->unites as $index => $u) {
+                $i = $index + 1;
+                $variables["unite_{$i}.numero"] = $u->numero_unite;
+                $variables["unite_{$i}.adresse"] = $u->adresse_complete;
+                $variables["unite_{$i}.titre_foncier"] = $u->titre_foncier;
+                $variables["unite_{$i}.immeuble"] = $u->immeuble;
+                $variables["unite_{$i}.bloc"] = $u->bloc;
+                $variables["unite_{$i}.etage"] = $u->etage;
+                $variables["unite_{$i}.type"] = $u->type_unite;
+                $variables["unite_{$i}.superficie"] = $u->superficie_m2;
+                $variables["unite_{$i}.nb_pieces"] = $u->nb_pieces;
+                $variables["unite_{$i}.nb_sdb"] = $u->nb_sdb;
+                $variables["unite_{$i}.description"] = $u->description_bien;
+                $variables["unite_{$i}.taux_gestion_pct"] = $u->taux_gestion_pct;
+            }
+        }
+
+        // === PROPRIETAIRES VARIABLES ===
+        // Get all unique proprietaires from all unites
+        $allProprietaires = collect();
+        foreach ($mandat->unites as $u) {
+            if ($u->proprietaires) {
+                foreach ($u->proprietaires as $p) {
+                    if (!$allProprietaires->contains('id', $p->id)) {
+                        $allProprietaires->push($p);
+                    }
+                }
+            }
+        }
+        
+        $proprietairesCount = $allProprietaires->count();
+        $variables['proprietaires.count'] = $proprietairesCount;
+        
+        if ($proprietairesCount > 0) {
+            $variables['proprietaires.liste'] = $allProprietaires->map(function($p) {
+                return $p->nom_raison ?: $p->email ?: '#'.$p->id;
+            })->implode(', ');
+            
+            // Always generate indexed variables for each proprietaire
+            foreach ($allProprietaires as $index => $p) {
+                $i = $index + 1;
+                
+                // Get pivot data from first unite where this proprietaire appears
+                $pivot = null;
+                foreach ($mandat->unites as $u) {
+                    $found = $u->proprietaires->firstWhere('id', $p->id);
+                    if ($found) {
+                        $pivot = $found->pivot;
+                        break;
+                    }
+                }
+                
+                $variables["proprietaire_{$i}.nom_complet"] = $p->nom_raison;
+                $variables["proprietaire_{$i}.cin"] = $p->cin;
+                $variables["proprietaire_{$i}.rc"] = $p->rc;
+                $variables["proprietaire_{$i}.chiffre_affaires"] = $p->chiffre_affaires;
+                $variables["proprietaire_{$i}.ice"] = $p->ice;
+                $variables["proprietaire_{$i}.adresse"] = $p->adresse;
+                $variables["proprietaire_{$i}.telephone"] = $p->telephone;
+                $variables["proprietaire_{$i}.email"] = $p->email;
+                $variables["proprietaire_{$i}.type"] = $p->type_proprietaire;
+                $variables["proprietaire_{$i}.representant_legal"] = $p->representant_nom;
+                
+                $variables["proprietaire_{$i}.part_numerateur"] = $pivot?->part_numerateur;
+                $variables["proprietaire_{$i}.part_denominateur"] = $pivot?->part_denominateur;
+                $variables["proprietaire_{$i}.pourcentage"] = $pivot?->pourcentage;
+            }
+        }
+
+        return $variables;
     }
 
     public function destroy(MandatGestion $mandats_gestion)
@@ -96,11 +360,104 @@ class MandatGestionController extends Controller
         return response()->json(null, 204);
     }
 
+    public function downloadPdf(MandatGestion $mandats_gestion)
+    {
+        $this->middleware('permission:mandats.view');
+        
+        $mandat = $mandats_gestion->load(['unites.proprietaires']);
+        
+        $pdf = Pdf::loadView('pdf.mandat', ['mandat' => $mandat]);
+        
+        $filename = 'mandat_' . ($mandat->reference ?: $mandat->id) . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
+    public function generatePdf(Request $request, MandatGestion $mandats_gestion)
+    {
+        $this->middleware('permission:mandats.view');
+        
+        $htmlContent = $request->input('html_content');
+        
+        if (!$htmlContent) {
+            return response()->json(['message' => 'HTML content is required'], 400);
+        }
+
+        // 1. Variable Substitution
+        $mandat = $mandats_gestion->load(['unites.proprietaires']);
+        $baseVars = $this->getEditorVariables($mandat);
+        
+        // Merge with any variables passed from frontend
+        $frontendVars = $request->input('doc_variables', []);
+        if (is_string($frontendVars)) {
+             $frontendVars = json_decode($frontendVars, true) ?? [];
+        }
+        $allVars = array_merge($baseVars, $frontendVars);
+
+        $htmlContent = preg_replace_callback('/{{\s*([^}]+)\s*}}/', function($m) use ($allVars) {
+            $key = trim($m[1]);
+            return array_key_exists($key, $allVars) ? ($allVars[$key] ?? '') : $m[0];
+        }, $htmlContent);
+
+        // 2. Arabic Text Processing
+        // We use ArPHP to reshape Arabic glyphs for dompdf
+        try {
+            $arabic = new \ArPHP\I18N\Arabic('Glyphs');
+            
+            // Apply reshaping only to text content between tags
+            $htmlContent = preg_replace_callback('/>([^<]+)</', function($matches) use ($arabic) {
+                $content = $matches[1];
+                
+                // Find Arabic sequences (words, spaces, commas, dots, numbers) to reshape as a block
+                // We include numbers so they can be positioned correctly relative to Arabic text in RTL mode
+                    return '>' . preg_replace_callback('/([\p{Arabic}\p{Mn}]+(?:[\s,\.]*[\p{Arabic}\p{Mn}]+)*)/u', function($m) use ($arabic) {
+                        $text = $m[1];
+                        // Reshape Arabic glyphs without reversing characters
+                        $reshaped = $arabic->utf8Glyphs($text);
+
+                        // Force Latin digits (0-9) instead of Eastern Arabic numerals
+                        $eastern = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+                        $latin = ['0','1','2','3','4','5','6','7','8','9'];
+                        $reshaped = str_replace($eastern, $latin, $reshaped);
+
+                        // Ensure RTL rendering for this Arabic block
+                        return '<span dir="rtl">' . $reshaped . '</span>';
+                    }, $content) . '<';
+            }, $htmlContent);
+        } catch (\Exception $e) {
+            // Fallback if ArPHP fails or not installed (though we installed it)
+            \Log::warning('Arabic reshaping failed: ' . $e->getMessage());
+        }
+
+        // Wrap content in basic HTML structure for PDF
+        $html = '<!DOCTYPE html>
+        <html>
+        <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+            <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+            <style>
+                body { font-family: "Tajawal", sans-serif; }
+                img { max-width: 100%; }
+                table { width: 100%; border-collapse: collapse; }
+                td, th { border: 1px solid #ddd; padding: 8px; }
+            </style>
+        </head>
+        <body>' . $htmlContent . '</body>
+        </html>';
+        
+        $pdf = Pdf::loadHTML($html);
+        $pdf->setOption(['isRemoteEnabled' => true]);
+        
+        $filename = 'mandat_' . ($mandats_gestion->reference ?: $mandats_gestion->id) . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
     public function downloadDocx(MandatGestion $mandats_gestion)
     {
         $this->middleware('permission:mandats.view');
         
-        $mandat = $mandats_gestion->load(['unite.proprietaires']);
+        $mandat = $mandats_gestion->load(['unites.proprietaires']);
         
         // Create PhpWord document
         $phpWord = new PhpWord();
@@ -142,8 +499,11 @@ class MandatGestionController extends Controller
         $section->addTextBreak(1);
         
         $proprietaire = null;
-        if ($mandat->unite && $mandat->unite->proprietaires->isNotEmpty()) {
-            $proprietaire = $mandat->unite->proprietaires->first();
+        if ($mandat->unites->isNotEmpty()) {
+            $unite = $mandat->unites->first();
+            if ($unite->proprietaires->isNotEmpty()) {
+                $proprietaire = $unite->proprietaires->first();
+            }
         }
 
         if ($proprietaire) {
@@ -193,83 +553,10 @@ class MandatGestionController extends Controller
         if ($mandat->date_fin) {
             $section->addText('Date de fin : ' . date('d/m/Y', strtotime($mandat->date_fin)), 'normalStyle');
         }
-        
-        $section->addTextBreak(1);
-        
-        // Section 3: Honoraires
-        $section->addText('III. HONORAIRES DE GESTION', 'headerStyle');
-        $section->addTextBreak(1);
-        
-        if ($mandat->taux_gestion_pct) {
-            $section->addText('Taux de gestion : ' . $mandat->taux_gestion_pct . ' %', 'normalStyle');
-        }
-        $section->addText('Assiette des honoraires : ' . ucfirst(str_replace('_', ' ', $mandat->assiette_honoraires)), 'normalStyle');
-        
-        if ($mandat->frais_min_mensuel) {
-            $section->addText('Frais minimum mensuel : ' . number_format($mandat->frais_min_mensuel, 2) . ' MAD', 'normalStyle');
-        }
-        
-        if ($mandat->tva_applicable) {
-            $section->addText('TVA applicable : Oui (' . ($mandat->tva_taux ?: '20') . ' %)', 'normalStyle');
-        }
-        
-        if ($mandat->periodicite_releve) {
-            $section->addText('Périodicité des relevés : ' . ucfirst($mandat->periodicite_releve), 'normalStyle');
-        }
-        
-        $section->addTextBreak(1);
-        
-        // Section 4: Description du bien
-        if ($mandat->description_bien) {
-            $section->addText('IV. DESCRIPTION DU BIEN', 'headerStyle');
-            $section->addTextBreak(1);
-            
-            $section->addText($mandat->description_bien, 'normalStyle', 'justified');
-            
-            if ($mandat->usage_bien) {
-                $section->addText('Usage : ' . ucfirst($mandat->usage_bien), 'normalStyle');
-            }
-            
-            $section->addTextBreak(1);
-        }
-        
-        // Section 5: Pouvoirs accordés
-        if ($mandat->pouvoirs_accordes) {
-            $section->addText('V. POUVOIRS ACCORDÉS AU GESTIONNAIRE', 'headerStyle');
-            $section->addTextBreak(1);
-            
-            $section->addText($mandat->pouvoirs_accordes, 'normalStyle', 'justified');
-            
-            $section->addTextBreak(1);
-        }
-        
-        // Section 6: Autres dispositions
-        $section->addText('VI. AUTRES DISPOSITIONS', 'headerStyle');
-        $section->addTextBreak(1);
-        
-        if ($mandat->charge_maintenance) {
-            $section->addText('Charge de maintenance : ' . ucfirst(str_replace('_', ' ', $mandat->charge_maintenance)), 'normalStyle');
-        }
-        if ($mandat->mode_versement) {
-            $section->addText('Mode de versement : ' . ucfirst($mandat->mode_versement), 'normalStyle');
-        }
-        
-        if ($mandat->notes_clauses) {
-            $section->addTextBreak(1);
-            $section->addText('Notes et clauses particulières :', 'subHeaderStyle');
-            $section->addText($mandat->notes_clauses, 'normalStyle', 'justified');
-        }
-        
-        $section->addTextBreak(2);
-        
-        // Signature section
-        $section->addText('SIGNATURES', 'headerStyle');
-        $section->addTextBreak(1);
-        
-        // Create table for signatures
+
+        // Signatures table
         $table = $section->addTable([
-            'borderSize' => 0,
-            'cellMargin' => 50,
+            'alignment' => \PhpOffice\PhpWord\SimpleType\JcTable::CENTER,
             'width' => 100 * 50,
         ]);
         
@@ -303,36 +590,5 @@ class MandatGestionController extends Controller
         $objWriter->save($tempFile);
         
         return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
-    }
-
-    private function validatedData(Request $request, bool $creating, ?int $id = null): array
-    {
-        $uniqueRef = 'unique:mandats_gestion,reference';
-        if (!$creating && $id) {
-            $uniqueRef = 'unique:mandats_gestion,reference,' . $id;
-        }
-
-        return $request->validate([
-            'unite_id'           => ['required', 'exists:unites,id'],
-            'reference'          => ['nullable', 'string', 'max:80', $uniqueRef],
-            'date_debut'         => ['required', 'date'],
-            'date_fin'           => ['nullable', 'date', 'after_or_equal:date_debut'],
-            'taux_gestion_pct'   => ['nullable', 'numeric', 'between:0,100'],
-            'assiette_honoraires'=> ['required', 'in:loyers_encaisse,loyers_factures'],
-            'tva_applicable'     => ['nullable', 'boolean'],
-            'tva_taux'           => ['nullable', 'numeric', 'between:0,100'],
-            'frais_min_mensuel'  => ['nullable', 'numeric'],
-            'periodicite_releve' => ['nullable', 'in:mensuel,trimestriel,annuel'],
-            'charge_maintenance' => ['nullable', 'in:proprietaire,gestionnaire,locataire,mixte'],
-            'mode_versement'     => ['nullable', 'in:virement,cheque,especes,prelevement'],
-            'description_bien'   => ['nullable', 'string'],
-            'usage_bien'         => ['nullable', 'in:habitation,commercial,professionnel,autre'],
-            'pouvoirs_accordes'  => ['nullable', 'string'],
-            'lieu_signature'     => ['nullable', 'string', 'max:120'],
-            'date_signature'     => ['nullable', 'date'],
-            'langue'             => ['nullable', 'in:ar,fr,ar_fr'],
-            'notes_clauses'      => ['nullable', 'string'],
-            'statut'             => ['nullable', 'in:brouillon,en_validation,signe,actif,resilie'],
-        ]);
     }
 }

@@ -48,17 +48,19 @@ class CompleteApplicationSeeder extends Seeder
 
         $this->command->info('Creation des permissions et roles...');
         $this->call([
-            RolePermissionSeeder::class,
-            PrestatairePermissionSeeder::class,
-            InterventionPermissionSeeder::class,
-            ReclamationPermissionSeeder::class,
-            WorkflowPermissionSeeder::class,
-            ChargePermissionSeeder::class,
-            PaiementPermissionSeeder::class,
-            UniteOwnershipPermissionSeeder::class,
-            LiquidationPermissionSeeder::class,
+            // RolePermissionSeeder::class,
+            // PrestatairePermissionSeeder::class,
+            // InterventionPermissionSeeder::class,
+            // ReclamationPermissionSeeder::class,
+            // WorkflowPermissionSeeder::class,
+            // ChargePermissionSeeder::class,
+            // PaiementPermissionSeeder::class,
+            // UniteOwnershipPermissionSeeder::class,
+            // LiquidationPermissionSeeder::class,
             StatusPermissionSeeder::class,
             AudioPermissionSeeder::class,
+            InterventionPermissionSeeder::class,
+            // MissionPermissionSeeder::class,
         ]);
 
         $this->command->info('Creation des utilisateurs...');

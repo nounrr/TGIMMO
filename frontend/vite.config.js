@@ -10,4 +10,21 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost/tgi/backend/public",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path,
+      },
+      "/storage": {
+        target: "http://localhost/tgi/backend/public",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path,
+      }
+    }
+  }
 })
+

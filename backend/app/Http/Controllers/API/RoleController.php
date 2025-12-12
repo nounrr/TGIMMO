@@ -34,13 +34,21 @@ class RoleController extends Controller
         $data = $request->validate([
             'name' => ['required','string','max:255', Rule::unique('roles','name')->where('guard_name','api')],
             'permissions' => ['array'],
-            'permissions.*' => ['string','distinct']
+            'permissions.*' => ['string','distinct'],
+            'status_add_allowed' => ['nullable', 'string'],
+            'status_edit_allowed' => ['nullable', 'string'],
+            'status_view_allowed' => ['nullable', 'string'],
+            'status_delete_allowed' => ['nullable', 'string'],
         ]);
 
-        $role = Role::create([
-            'name' => $data['name'],
-            'guard_name' => 'api',
-        ]);
+        $role = new Role();
+        $role->name = $data['name'];
+        $role->guard_name = 'api';
+        $role->status_add_allowed = $data['status_add_allowed'] ?? null;
+        $role->status_edit_allowed = $data['status_edit_allowed'] ?? null;
+        $role->status_view_allowed = $data['status_view_allowed'] ?? null;
+        $role->status_delete_allowed = $data['status_delete_allowed'] ?? null;
+        $role->save();
 
         if (!empty($data['permissions'])) {
             $perms = Permission::whereIn('name', $data['permissions'])->where('guard_name','api')->pluck('name');
@@ -63,7 +71,11 @@ class RoleController extends Controller
         $data = $request->validate([
             'name' => ['sometimes','required','string','max:255', Rule::unique('roles','name')->where('guard_name','api')->ignore($role->id)],
             'permissions' => ['sometimes','array'],
-            'permissions.*' => ['string','distinct']
+            'permissions.*' => ['string','distinct'],
+            'status_add_allowed' => ['nullable', 'string'],
+            'status_edit_allowed' => ['nullable', 'string'],
+            'status_view_allowed' => ['nullable', 'string'],
+            'status_delete_allowed' => ['nullable', 'string'],
         ]);
 
         if (array_key_exists('name', $data)) {
@@ -71,6 +83,12 @@ class RoleController extends Controller
                 return response()->json(['message' => "Le rôle 'admin' ne peut pas être renommé."], 422);
             }
             $role->name = $data['name'];
+        }
+
+        foreach (['status_add_allowed', 'status_edit_allowed', 'status_view_allowed', 'status_delete_allowed'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $role->$field = $data[$field];
+            }
         }
 
         $role->save();

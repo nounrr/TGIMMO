@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasDocuments;
 
 class Proprietaire extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDocuments;
 
     protected $table = 'proprietaires';
 
@@ -17,25 +18,30 @@ class Proprietaire extends Model
         'prenom_ar',
         'cin',
         'rc',
+        'chiffre_affaires',
         'ice',
         'ifiscale',
         'adresse',
         'adresse_ar',
+        'ville',
         'telephone',
         'email',
+        'rib',
         'representant_nom',
         'representant_fonction',
         'representant_cin',
         'type_proprietaire',
         'statut',
-        'taux_gestion_tgi_pct',
-        'part_liquidation_pct',
+        'taux_gestion',
+        'assiette_honoraires',
+        'periodicite_releve',
         'conditions_particulieres',
     ];
 
     protected $casts = [
-        'taux_gestion_tgi_pct' => 'decimal:2',
-        'part_liquidation_pct' => 'decimal:2',
+        'telephone' => 'array',
+        'taux_gestion' => 'decimal:2',
+        'chiffre_affaires' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

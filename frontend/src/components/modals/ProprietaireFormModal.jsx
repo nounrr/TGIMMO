@@ -29,8 +29,10 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
     prenom_ar: '',
     cin: '',
     rc: '',
+    chiffre_affaires: '',
     ice: '',
     ifiscale: '',
+    ville: '',
     adresse: '',
     adresse_ar: '',
     telephone: '',
@@ -41,7 +43,9 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
     type_proprietaire: 'unique',
     statut: 'brouillon',
     taux_gestion_tgi_pct: '',
-    part_liquidation_pct: '',
+    taux_gestion: '',
+    assiette_honoraires: 'loyers_encaisse',
+    periodicite_releve: 'mensuel',
     conditions_particulieres: '',
   });
 
@@ -53,8 +57,10 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
         prenom_ar: proprietaire.prenom_ar || '',
         cin: proprietaire.cin || '',
         rc: proprietaire.rc || '',
+        chiffre_affaires: proprietaire.chiffre_affaires || '',
         ice: proprietaire.ice || '',
         ifiscale: proprietaire.ifiscale || '',
+        ville: proprietaire.ville || '',
         adresse: proprietaire.adresse || '',
         adresse_ar: proprietaire.adresse_ar || '',
         telephone: proprietaire.telephone || '',
@@ -65,7 +71,9 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
         type_proprietaire: proprietaire.type_proprietaire || 'unique',
         statut: proprietaire.statut || 'brouillon',
         taux_gestion_tgi_pct: proprietaire.taux_gestion_tgi_pct || '',
-        part_liquidation_pct: proprietaire.part_liquidation_pct || '',
+        taux_gestion: proprietaire.taux_gestion || '',
+        assiette_honoraires: proprietaire.assiette_honoraires || 'loyers_encaisse',
+        periodicite_releve: proprietaire.periodicite_releve || 'mensuel',
         conditions_particulieres: proprietaire.conditions_particulieres || '',
       });
     } else {
@@ -75,8 +83,10 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
         prenom_ar: '',
         cin: '',
         rc: '',
+        chiffre_affaires: '',
         ice: '',
         ifiscale: '',
+        ville: '',
         adresse: '',
         adresse_ar: '',
         telephone: '',
@@ -87,7 +97,9 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
         type_proprietaire: 'unique',
         statut: 'brouillon',
         taux_gestion_tgi_pct: '',
-        part_liquidation_pct: '',
+        taux_gestion: '',
+        assiette_honoraires: 'loyers_encaisse',
+        periodicite_releve: 'mensuel',
         conditions_particulieres: '',
       });
     }
@@ -102,9 +114,42 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
     }));
   };
 
+  const [validationErrors, setValidationErrors] = useState({});
+
+  const validateForm = () => {
+    const errors = {};
+    const cinRegex = /^[A-Z]{1,2}[0-9]{1,6}$/;
+    const iceRegex = /^[0-9]{15}$/;
+    const phoneRegex = /^0[5-7][0-9]{8}$/;
+    const ribRegex = /^[0-9]{24}$/;
+
+    if (formData.cin && !cinRegex.test(formData.cin)) {
+      errors.cin = "Le CIN doit commencer par 1 ou 2 lettres suivies de 1 à 6 chiffres.";
+    }
+    if (formData.ice && !iceRegex.test(formData.ice)) {
+      errors.ice = "L'ICE doit contenir exactement 15 chiffres.";
+    }
+    if (formData.telephone && !phoneRegex.test(formData.telephone)) {
+      errors.telephone = "Le numéro de téléphone doit être au format marocain (ex: 0612345678).";
+    }
+    if (formData.rib && !ribRegex.test(formData.rib)) {
+      errors.rib = "Le RIB doit contenir exactement 24 chiffres.";
+    }
+    if (formData.ifiscale && !/^[0-9]+$/.test(formData.ifiscale)) {
+      errors.ifiscale = "L'identifiant fiscal doit contenir uniquement des chiffres.";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       if (isEdit) {
@@ -404,6 +449,7 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                             e.target.style.boxShadow = '';
                           }}
                         />
+                        {validationErrors.cin && <div className="text-danger small mt-1">{validationErrors.cin}</div>}
                       </div>
 
                       <div className="col-md-6">
@@ -415,6 +461,35 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                           value={formData.rc}
                           onChange={handleChange}
                           placeholder="Numéro RC"
+                          style={{
+                            background: '#f8fafc',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '12px',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.background = 'white';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.background = '#f8fafc';
+                            e.target.style.boxShadow = '';
+                          }}
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small text-slate-700">Capital Social</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-control border-0 shadow-sm"
+                          name="chiffre_affaires"
+                          value={formData.chiffre_affaires}
+                          onChange={handleChange}
+                          onWheel={(e) => e.target.blur()}
+                          placeholder="0.00"
                           style={{
                             background: '#f8fafc',
                             padding: '0.75rem 1rem',
@@ -458,6 +533,7 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                             e.target.style.boxShadow = '';
                           }}
                         />
+                        {validationErrors.ice && <div className="text-danger small mt-1">{validationErrors.ice}</div>}
                       </div>
 
                       <div className="col-md-6">
@@ -485,6 +561,7 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                             e.target.style.boxShadow = '';
                           }}
                         />
+                        {validationErrors.ifiscale && <div className="text-danger small mt-1">{validationErrors.ifiscale}</div>}
                       </div>
                     </div>
                   </div>
@@ -586,6 +663,7 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                             e.target.style.boxShadow = '';
                           }}
                         />
+                        {validationErrors.telephone && <div className="text-danger small mt-1">{validationErrors.telephone}</div>}
                       </div>
 
                       <div className="col-md-6">
@@ -736,6 +814,7 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                           name="taux_gestion_tgi_pct"
                           value={formData.taux_gestion_tgi_pct}
                           onChange={handleChange}
+                          onWheel={(e) => e.target.blur()}
                           placeholder="Ex: 10.00"
                           style={{
                             background: '#f8fafc',
@@ -756,16 +835,17 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                       </div>
 
                       <div className="col-md-6">
-                        <label className="form-label fw-semibold small text-slate-700">Part de liquidation (%)</label>
+                        <label className="form-label fw-semibold small text-slate-700">Taux des honoraires</label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           max="100"
                           className="form-control border-0 shadow-sm"
-                          name="part_liquidation_pct"
-                          value={formData.part_liquidation_pct}
+                          name="taux_gestion"
+                          value={formData.taux_gestion}
                           onChange={handleChange}
+                          onWheel={(e) => e.target.blur()}
                           placeholder="Ex: 5.00"
                           style={{
                             background: '#f8fafc',
@@ -783,6 +863,64 @@ export default function ProprietaireFormModal({ show, onHide, proprietaire = nul
                             e.target.style.boxShadow = '';
                           }}
                         />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small text-slate-700">Assiette honoraires</label>
+                        <select
+                          className="form-select border-0 shadow-sm"
+                          name="assiette_honoraires"
+                          value={formData.assiette_honoraires}
+                          onChange={handleChange}
+                          style={{
+                            background: '#f8fafc',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '12px',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.background = 'white';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.background = '#f8fafc';
+                            e.target.style.boxShadow = '';
+                          }}
+                        >
+                          <option value="loyers_encaisse">Loyers encaissés</option>
+                          <option value="loyers_factures">Loyers émis</option>
+                        </select>
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold small text-slate-700">Périodicité relevé</label>
+                        <select
+                          className="form-select border-0 shadow-sm"
+                          name="periodicite_releve"
+                          value={formData.periodicite_releve}
+                          onChange={handleChange}
+                          style={{
+                            background: '#f8fafc',
+                            padding: '0.75rem 1rem',
+                            fontSize: '0.95rem',
+                            borderRadius: '12px',
+                            transition: 'all 0.2s'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.background = 'white';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.background = '#f8fafc';
+                            e.target.style.boxShadow = '';
+                          }}
+                        >
+                          <option value="mensuel">Mensuel</option>
+                          <option value="trimestriel">Trimestriel</option>
+                          <option value="semestriel">Semestriel</option>
+                          <option value="annuel">Annuel</option>
+                        </select>
                       </div>
 
                       <div className="col-12">

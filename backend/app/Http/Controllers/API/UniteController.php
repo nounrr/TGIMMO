@@ -22,7 +22,7 @@ class UniteController extends Controller
 
     public function index(Request $request)
     {
-        $q = Unite::query()->with('proprietaires');
+        $q = Unite::query()->with(['activeMandats', 'proprietaires']);
         
         // Appliquer le filtrage par statut selon les permissions
         $q = $this->applyStatusPermissions($q, 'unites');
@@ -47,15 +47,6 @@ class UniteController extends Controller
         if ($request->boolean('withLocataire')) {
             $q->with('locataireActuel');
         }
-
-        if ($sortBy = $request->query('sort_by')) {
-            $direction = $request->query('order', 'asc');
-            if (in_array($sortBy, ['created_at', 'updated_at', 'numero_unite', 'immeuble', 'type_unite'])) {
-                $q->orderBy($sortBy, $direction);
-            }
-        } else {
-            $q->orderBy('created_at', 'desc');
-        }
         
         // Statistiques globales (indépendantes des filtres)
         $stats = [
@@ -69,8 +60,13 @@ class UniteController extends Controller
         // Tri sécurisé
         $sortBy = $request->query('sort_by');
         $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $allowedSorts = ['numero_unite','type_unite','statut','adresse_complete','superficie_m2','nb_pieces','created_at'];
-        if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
+        $allowedSorts = ['numero_unite','type_unite','statut','adresse_complete','superficie_m2','nb_pieces','created_at', 'updated_at', 'is_linked'];
+        
+        if ($sortBy === 'is_linked') {
+            $q->withCount(['mandats as is_linked_count' => function ($query) {
+                $query->whereIn('statut', ['actif', 'en_attente', 'modifier', 'signe']);
+            }])->orderBy('is_linked_count', $sortDir);
+        } elseif ($sortBy && in_array($sortBy, $allowedSorts, true)) {
             $q->orderBy($sortBy, $sortDir);
         } else {
             // Ordre par défaut
@@ -88,6 +84,13 @@ class UniteController extends Controller
     {
         $data = $this->validateData($request, true);
         
+        // Handle auto-generation of numero_unite if empty
+        $needsAutoNumber = false;
+        if (empty($data['numero_unite'])) {
+            $data['numero_unite'] = 'TEMP_' . uniqid();
+            $needsAutoNumber = true;
+        }
+
         $owners = $request->input('owners', []);
         // If single owner was passed (legacy or simple form), convert to array format
         if (empty($owners) && isset($data['proprietaire_id'])) {
@@ -101,7 +104,13 @@ class UniteController extends Controller
 
         $unite = Unite::create($data);
 
+        if ($needsAutoNumber) {
+            $unite->update(['numero_unite' => 'U_' . $unite->id]);
+            $unite->refresh();
+        }
+
         if (!empty($owners) && is_array($owners)) {
+            // Direct link without MandatGestion
             foreach ($owners as $owner) {
                 if (empty($owner['proprietaire_id'])) continue;
                 
@@ -109,10 +118,12 @@ class UniteController extends Controller
                 $den = $owner['part_denominateur'] ?? 1;
                 $pct = ($den > 0) ? ($num / $den) * 100 : 0;
 
-                $unite->proprietaires()->attach($owner['proprietaire_id'], [
+                \App\Models\UniteProprietaire::create([
+                    'unite_id' => $unite->id,
+                    'proprietaire_id' => $owner['proprietaire_id'],
                     'part_numerateur' => $num,
                     'part_denominateur' => $den,
-                    // 'part_pourcent' is a generated column, do not insert manually
+                    'pourcentage' => $pct,
                     'date_debut' => now(),
                 ]);
             }
@@ -133,6 +144,36 @@ class UniteController extends Controller
     {
         $data = $this->validateData($request, false, $unite);
         $unite->fill($data)->save();
+
+        // Handle owners update if provided
+        if ($request->has('owners')) {
+            $owners = $request->input('owners', []);
+            
+            // Delete existing direct links (no mandate)
+            \App\Models\UniteProprietaire::where('unite_id', $unite->id)
+                ->whereNull('mandat_id')
+                ->delete();
+
+            if (!empty($owners)) {
+                foreach ($owners as $owner) {
+                    if (empty($owner['proprietaire_id'])) continue;
+                    
+                    $num = $owner['part_numerateur'] ?? 1;
+                    $den = $owner['part_denominateur'] ?? 1;
+                    $pct = ($den > 0) ? ($num / $den) * 100 : 0;
+
+                    \App\Models\UniteProprietaire::create([
+                        'unite_id' => $unite->id,
+                        'proprietaire_id' => $owner['proprietaire_id'],
+                        'part_numerateur' => $num,
+                        'part_denominateur' => $den,
+                        'pourcentage' => $pct,
+                        // No mandate_id
+                    ]);
+                }
+            }
+        }
+
         return response()->json($unite);
     }
 
@@ -161,7 +202,7 @@ class UniteController extends Controller
 
         // Pour le commercial: seul le numero_unite est requis, tous les autres champs sont optionnels
         $rules = [
-            'numero_unite' => ['required', 'string', 'max:50'], // Toujours requis
+            'numero_unite' => ['nullable', 'string', 'max:50'], // Optionnel, auto-généré si vide
             'type_unite' => ['nullable', 'string', 'max:100'],
             'adresse_complete' => ['nullable', 'string', 'max:255'],
             'immeuble' => ['nullable', 'string', 'max:150'],
@@ -175,6 +216,13 @@ class UniteController extends Controller
             'equipements' => ['nullable', 'string'],
             'mobilier' => ['nullable', 'string'],
             'proprietaire_id' => ['nullable', 'exists:proprietaires,id'],
+            'coordonnees_gps' => ['nullable', 'string'],
+            
+            // Nouveaux champs de gestion
+            'taux_gestion_pct' => ['nullable', 'numeric', 'between:0,100'],
+            'frais_min_mensuel' => ['nullable', 'numeric', 'min:0'],
+            'description_bien' => ['nullable', 'string'],
+            'pouvoirs_accordes' => ['nullable', 'string'],
         ];
 
         $data = $request->validate($rules);

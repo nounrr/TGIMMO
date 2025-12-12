@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useGetReclamationsQuery, useGetReclamationTypesQuery, useGetBauxQuery } from '../api/baseApi';
+import { useGetReclamationsQuery, useGetReclamationTypesQuery, useGetUnitesQuery } from '../api/baseApi';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ export default function ReclamationsShadcn() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('all');
   const [typeId, setTypeId] = useState('all');
-  const [bailId, setBailId] = useState('all');
+  const [uniteId, setUniteId] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
   const [page, setPage] = useState(1);
@@ -30,17 +30,17 @@ export default function ReclamationsShadcn() {
     q: q || undefined,
     status: status !== 'all' ? status : undefined,
     reclamation_type_id: typeId !== 'all' ? typeId : undefined,
-    bail_id: bailId !== 'all' ? bailId : undefined,
+    unite_id: uniteId !== 'all' ? uniteId : undefined,
     sort_by: sortBy,
     order: sortOrder,
-  }), [q, status, typeId, bailId, sortBy, sortOrder, page, perPage]);
+  }), [q, status, typeId, uniteId, sortBy, sortOrder, page, perPage]);
 
   const { data: recData, isLoading } = useGetReclamationsQuery(params);
   const list = recData?.data || [];
   const meta = recData?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
   const { data: types } = useGetReclamationTypesQuery();
-  const { data: bauxData } = useGetBauxQuery({ per_page: 1000 });
-  const baux = bauxData?.data || [];
+  const { data: unitesData } = useGetUnitesQuery({ per_page: 1000 });
+  const unites = unitesData?.data || [];
 
   if (!can(PERMS.reclamations.view)) {
     return <div className="p-6 text-red-500">Accès refusé</div>;
@@ -168,7 +168,7 @@ export default function ReclamationsShadcn() {
               <TableRow className="bg-slate-50 hover:bg-slate-50">
                 <TableHead className="w-[80px]">ID</TableHead>
                 <TableHead>Sujet</TableHead>
-                <TableHead>Locataire / Bail</TableHead>
+                <TableHead>Unité</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead className="text-right">Date</TableHead>
@@ -196,13 +196,13 @@ export default function ReclamationsShadcn() {
                       {item.description}
                     </TableCell>
                     <TableCell>
-                      {item.bail ? (
+                      {item.unite ? (
                         <div className="flex flex-col">
                           <span className="font-medium text-sm">
-                            {item.bail.locataire?.prenom} {item.bail.locataire?.nom}
+                            {item.unite.numero_unite || `Unité #${item.unite.id}`}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            Bail #{item.bail.id}
+                            {item.unite.immeuble || item.unite.adresse || '-'}
                           </span>
                         </div>
                       ) : '-'}

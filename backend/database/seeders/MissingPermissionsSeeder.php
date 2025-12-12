@@ -12,8 +12,9 @@ class MissingPermissionsSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            LiquidationPermissionSeeder::class,
-            StatusPermissionSeeder::class,
+            // LiquidationPermissionSeeder::class,
+            // StatusPermissionSeeder::class,
+            GedPermissionSeeder::class,
         ]);
     }
 }

@@ -13,10 +13,85 @@ class BailPaiementController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permission:paiements.view')->only(['index', 'show']);
+        $this->middleware('permission:paiements.view')->only(['index', 'show', 'getAllBauxWithPaiements']);
         $this->middleware('permission:paiements.create')->only(['store']);
         $this->middleware('permission:paiements.update')->only(['update']);
         $this->middleware('permission:paiements.delete')->only(['destroy']);
+    }
+
+    // GET /paiements/all-baux - returns all active baux with their paiements
+    public function getAllBauxWithPaiements()
+    {
+        try {
+            $baux = Bail::with(['unite.proprietaires', 'locataire'])
+                ->whereNull('date_resiliation')
+                ->get();
+            
+            $result = $baux->map(function ($bail) {
+                $paiements = BailPaiement::where('bail_id', $bail->id)
+                    ->orderBy('period_year')
+                    ->orderBy('period_month')
+                    ->get();
+                
+                // Get charges for this locataire
+                $chargesLocataire = [];
+                if ($bail->locataire_id) {
+                    $chargesLocataire = \App\Models\ImputationCharge::where('impute_a', 'locataire')
+                        ->where('id_impute', $bail->locataire_id)
+                        ->get()
+                        ->map(fn($c) => [
+                            'id' => $c->id,
+                            'titre' => $c->titre,
+                            'montant' => $c->montant,
+                            'date_paiement' => $c->date_paiement,
+                            'statut_paiement' => $c->statut_paiement,
+                            'notes' => $c->notes,
+                            'created_at' => $c->created_at,
+                        ])
+                        ->toArray();
+                }
+                
+                return [
+                    'id' => $bail->id,
+                    'numero_bail' => $bail->numero_bail,
+                    'date_resiliation' => $bail->date_resiliation,
+                    'montant_loyer' => $bail->montant_loyer,
+                    'charges' => $bail->charges,
+                    'loyer_total' => $bail->loyer_total,
+                    'unite' => [
+                        'id' => $bail->unite->id ?? null,
+                        'numero_unite' => $bail->unite->numero_unite ?? null,
+                        'reference' => $bail->unite->reference ?? null,
+                        'adresse' => $bail->unite->adresse ?? null,
+                        'ville' => $bail->unite->ville ?? null,
+                        'proprietaires' => $bail->unite->proprietaires->map(fn($p) => [
+                            'id' => $p->id,
+                            'nom_raison' => $p->nom_raison,
+                            'nom_complet' => $p->nom_complet ?? $p->nom_raison,
+                            'cin' => $p->cin ?? null,
+                            'ice' => $p->ice ?? null,
+                        ]) ?? [],
+                    ],
+                    'locataire' => [
+                        'id' => $bail->locataire->id ?? null,
+                        'nom' => $bail->locataire->nom ?? null,
+                        'prenom' => $bail->locataire->prenom ?? null,
+                        'raison_sociale' => $bail->locataire->raison_sociale ?? null,
+                        'cin' => $bail->locataire->cin ?? null,
+                        'ice' => $bail->locataire->ice ?? null,
+                    ],
+                    'paiements' => $paiements,
+                    'charges_locataire' => $chargesLocataire,
+                ];
+            });
+            
+            return response()->json(['data' => $result]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'fetch_failed',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     // GET /baux/{bail}/paiements
@@ -96,5 +171,58 @@ class BailPaiementController extends Controller
         }
         $paiement->save();
         return response()->json(['data' => $paiement]);
+    }
+
+    // GET /baux/paiements-pending?month=YYYY-MM
+    public function pending(Request $request)
+    {
+        try {
+            $monthStr = $request->query('month');
+            $month = $monthStr ? Carbon::parse($monthStr.'-01') : Carbon::now();
+            $year = (int)$month->format('Y');
+            $m = (int)$month->format('n');
+
+            // Fetch active baux expected to pay monthly
+            $baux = Bail::with(['unite.proprietaires','locataire'])
+                ->whereNull('date_resiliation')
+                ->get();
+
+            $results = [];
+            foreach ($baux as $bail) {
+                // Find payment record for this period
+                $p = BailPaiement::where('bail_id', $bail->id)
+                    ->where('period_year', $year)
+                    ->where('period_month', $m)
+                    ->first();
+                $isPaid = $p && $p->status === 'valide';
+                $ownerName = null;
+                if ($bail->unite && $bail->unite->proprietaires) {
+                    $firstOwner = $bail->unite->proprietaires->first();
+                    $ownerName = $firstOwner?->nom_raison;
+                }
+                $results[] = [
+                    'bail_id' => $bail->id,
+                    'reference' => $bail->numero_bail ?? ('Bail#'.$bail->id),
+                    'proprietaire' => $ownerName,
+                    'unite' => ($bail->unite->numero_unite ?? $bail->unite->reference ?? null),
+                    'locataire' => ($bail->locataire->nom ?? $bail->locataire->raison_sociale ?? null),
+                    'month' => $month->format('Y-m'),
+                    'paiement' => $p,
+                    'is_paid' => $isPaid,
+                ];
+            }
+
+            // Unpaid first, then paid
+            usort($results, function($a,$b){
+                return ($a['is_paid'] <=> $b['is_paid']);
+            });
+
+            return response()->json(['data' => $results]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'pending_list_failed',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

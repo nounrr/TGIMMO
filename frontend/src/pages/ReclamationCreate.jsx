@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useCreateReclamationMutation, useUpdateReclamationMutation, useGetReclamationQuery, useGetReclamationsQuery, useGetReclamationTypesQuery, useGetBauxQuery } from '../api/baseApi';
+import { useCreateReclamationMutation, useUpdateReclamationMutation, useGetReclamationQuery, useGetReclamationsQuery, useGetReclamationTypesQuery, useGetUnitesQuery } from '../api/baseApi';
 import useAuthz from '../hooks/useAuthz';
 import { PERMS } from '../utils/permissionKeys';
 
@@ -17,14 +17,14 @@ export default function ReclamationCreate() {
   const location = useLocation();
   const isEdit = !!id;
   const { data: types } = useGetReclamationTypesQuery();
-  const { data: bauxData } = useGetBauxQuery({ per_page: 1000 });
-  const baux = bauxData?.data || [];
+  const { data: unitesData } = useGetUnitesQuery({ per_page: 1000 });
+  const unites = unitesData?.data || [];
   const [createRec, { isLoading: isCreating }] = useCreateReclamationMutation();
   const [updateRec, { isLoading: isUpdating }] = useUpdateReclamationMutation();
   const { data: recList } = useGetReclamationsQuery({}, { skip: !isEdit });
   const reclamationFromState = location.state?.reclamation;
 
-  const [form, setForm] = useState({ bail_id: '', reclamation_type_id: '', description: '', source: '' });
+  const [form, setForm] = useState({ unite_id: '', reclamation_type_id: '', description: '', source: '' });
   const [files, setFiles] = useState([]);
   const [error, setError] = useState(null);
 
@@ -50,7 +50,7 @@ export default function ReclamationCreate() {
   useEffect(() => {
     if (isEdit && sourceItem) {
       setForm({
-        bail_id: sourceItem.bail_id || '',
+        unite_id: sourceItem.unite_id || '',
         reclamation_type_id: sourceItem.reclamation_type_id || '',
         description: sourceItem.description || '',
         source: sourceItem.source || '',
@@ -106,9 +106,9 @@ export default function ReclamationCreate() {
     }),
   };
 
-  const bailOptions = (baux || []).map(b => ({
-    value: String(b.id),
-    label: `${b.numero_bail || `Bail #${b.id}`}${b.locataire ? ` - ${b.locataire.nom || ''}` : ''}`.trim()
+  const uniteOptions = (unites || []).map(u => ({
+    value: String(u.id),
+    label: `${u.numero_unite || `Unité #${u.id}`}${u.immeuble ? ` - ${u.immeuble}` : ''}${u.adresse ? ` (${u.adresse})` : ''}`.trim()
   }));
   const typeOptions = (types || []).map(t => ({ value: String(t.id), label: t.name }));
 
@@ -136,15 +136,15 @@ export default function ReclamationCreate() {
           <form onSubmit={submit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label>Bail <span className="text-red-500">*</span></Label>
+                <Label>Unité <span className="text-red-500">*</span></Label>
                 <Select
                   styles={customSelectStyles}
-                  options={bailOptions}
-                  value={form.bail_id ? bailOptions.find(o => o.value === String(form.bail_id)) : null}
-                  onChange={(opt) => setForm(f => ({ ...f, bail_id: opt ? opt.value : '' }))}
+                  options={uniteOptions}
+                  value={form.unite_id ? uniteOptions.find(o => o.value === String(form.unite_id)) : null}
+                  onChange={(opt) => setForm(f => ({ ...f, unite_id: opt ? opt.value : '' }))}
                   isClearable
                   isSearchable
-                  placeholder="Sélectionner un bail..."
+                  placeholder="Sélectionner une unité..."
                   required
                 />
               </div>

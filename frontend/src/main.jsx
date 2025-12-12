@@ -9,6 +9,8 @@ import './index.css';
 import App from './App.jsx';
 import { Toaster } from './components/ui/toaster';
 
+// Register Syncfusion license removed
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Provider store={store}>

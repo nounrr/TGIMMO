@@ -32,8 +32,7 @@ class ProprietaireFactory extends Factory
             'representant_cin' => $faker->optional()->bothify('??######'),
             'type_proprietaire' => $type,
             'statut' => $statut,
-            'taux_gestion_tgi_pct' => $faker->optional()->randomFloat(2, 0, 20),
-            'part_liquidation_pct' => $faker->optional()->randomFloat(2, 0, 100),
+            'taux_gestion' => $faker->optional()->randomFloat(2, 0, 100),
             'conditions_particulieres' => $faker->optional()->paragraph(),
         ];
     }

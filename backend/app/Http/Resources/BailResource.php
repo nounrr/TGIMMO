@@ -45,11 +45,10 @@ class BailResource extends JsonResource
                 'proprietaires' => $this->unite?->proprietaires->map(function($prop) {
                     return [
                         'id' => $prop->id,
-                        'nom' => $prop->nom,
-                        'prenom' => $prop->prenom,
-                        'nom_complet' => $prop->nom . ' ' . $prop->prenom,
+                        'nom_raison' => $prop->nom_raison,
+                        'type_proprietaire' => $prop->type_proprietaire,
                     ];
-                }),
+                }) ?? [],
             ],
 
             
@@ -72,6 +71,11 @@ class BailResource extends JsonResource
             // Équipements et observations
             'equipements' => $this->equipements,
             'observations' => $this->observations,
+            
+            // Document
+            'doc_content' => $this->doc_content,
+            'doc_variables' => $this->doc_variables,
+            'doc_template_key' => $this->doc_template_key,
             
             // Statut
             'statut' => $this->statut,

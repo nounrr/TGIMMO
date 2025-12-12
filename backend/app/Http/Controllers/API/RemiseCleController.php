@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\RemiseCle;
 use App\Models\Bail;
+use App\Services\DocumentTemplateService;
 use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 
@@ -149,9 +150,156 @@ class RemiseCleController extends Controller
             'date_remise' => ['required', 'date'],
             'cles' => ['required', 'array'],
             'remarques' => ['nullable', 'string'],
+            'doc_content' => ['nullable', 'string'],
+            'doc_variables' => ['nullable', 'array'],
+            'doc_template_key' => ['nullable', 'string'],
         ]);
 
         $remise = $bail->remisesCles()->create($data);
         return response()->json(['data' => $remise], 201);
+    }
+
+    public function show(RemiseCle $remiseCle)
+    {
+        $this->authorize('view', [RemiseCle::class, $remiseCle->bail]);
+        return response()->json(['data' => $remiseCle->load('bail.locataire', 'bail.unite')]);
+    }
+
+    public function update(Request $request, RemiseCle $remiseCle)
+    {
+        $this->authorize('update', $remiseCle);
+        $data = $request->validate([
+            'date_remise' => ['sometimes', 'date'],
+            'cles' => ['sometimes', 'array'],
+            'remarques' => ['nullable', 'string'],
+            'doc_content' => ['nullable', 'string'],
+            'doc_variables' => ['nullable', 'array'],
+            'doc_template_key' => ['nullable', 'string'],
+        ]);
+
+        $remiseCle->update($data);
+        return response()->json(['data' => $remiseCle]);
+    }
+
+    public function editorTemplate(RemiseCle $remiseCle, DocumentTemplateService $tpl)
+    {
+        $this->authorize('view', [RemiseCle::class, $remiseCle->bail]);
+        
+        $baseTemplate = <<<'EOT'
+<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #000;">
+    <h2 style="text-align: center; text-decoration: underline; margin-bottom: 30px;">FORMULAIRE DE REMISE DES CLÉS</h2>
+    
+    <p style="margin-bottom: 15px;">
+        <strong>TGI :</strong> {{proprietaire.nom_complet}} 
+        <span style="float: right;"><strong>Locataire :</strong> {{locataire.nom_complet}}</span>
+    </p>
+    <p style="margin-bottom: 20px;"><strong>Adresse du bien loué :</strong> {{unite.adresse}}</p>
+    
+    <p><strong>Clés remises :</strong></p>
+    <table style="width: 100%; border: none; margin-bottom: 20px;">
+        <tr>
+            <td style="padding: 5px;">{{checkbox_porte}} Porte principale – Nombre : {{remise.qty_porte}}</td>
+            <td style="padding: 5px;">{{checkbox_boite}} Boîte aux lettres – Nombre : {{remise.qty_boite}}</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px;">{{checkbox_garage}} Portail / Garage – Nombre : {{remise.qty_garage}}</td>
+            <td style="padding: 5px;">{{checkbox_autre}} Autres (préciser) : {{remise.autres_details}}</td>
+        </tr>
+    </table>
+    
+    <p style="margin-bottom: 20px;"><strong>Date de remise :</strong> {{remise.date_jour}} / {{remise.date_mois}} / {{remise.date_annee}} à {{remise.heure}} heures</p>
+    
+    <p style="text-align: justify; margin-bottom: 20px;">
+        Je soussigné(e), M./Mme <strong>{{proprietaire.nom_complet}}</strong>, bailleur, atteste avoir remis les clés du logement cité ci-dessus à M./Mme <strong>{{locataire.nom_complet}}</strong>, locataire.
+    </p>
+    
+    <p style="margin-bottom: 40px;">Fait à <strong>Casablanca</strong>, le {{remise.date_jour}} / {{remise.date_mois}} / {{remise.date_annee}}</p>
+    
+    <table style="width: 100%;">
+        <tr>
+            <td style="width: 50%; vertical-align: top;"><strong>Signature du bailleur :</strong></td>
+            <td style="width: 50%; vertical-align: top;"><strong>Signature du locataire :</strong></td>
+        </tr>
+    </table>
+</div>
+EOT;
+
+        $bail = $remiseCle->bail;
+        $unite = $bail->unite;
+        $locataire = $bail->locataire;
+        $proprietaire = $unite->activeMandat?->proprietaires->first();
+        
+        // Helper to extract quantity
+        $cles = $remiseCle->cles ?? [];
+        $getQty = function($type) use ($cles) {
+            foreach ($cles as $c) {
+                if (($c['type'] ?? '') === $type) return $c['nombre'] ?? 0;
+            }
+            return 0;
+        };
+        
+        $qtyPorte = $getQty('porte_principale');
+        $qtyBoite = $getQty('boite_lettres');
+        $qtyGarage = $getQty('portail_garage');
+        
+        // Extract "autres"
+        $autres = [];
+        foreach ($cles as $c) {
+            if (($c['type'] ?? '') === 'autre') {
+                $autres[] = ($c['label'] ?? 'Autre') . ' (' . ($c['nombre'] ?? 0) . ')';
+            }
+        }
+        $autresStr = empty($autres) ? '.............................................' : implode(', ', $autres);
+        $qtyAutre = count($autres);
+
+        $date = $remiseCle->date_remise;
+
+        $variables = [
+            'remise.date_remise' => $date ? $date->format('d/m/Y H:i') : '',
+            'remise.date_jour' => $date ? $date->format('d') : '...',
+            'remise.date_mois' => $date ? $date->format('m') : '...',
+            'remise.date_annee' => $date ? $date->format('Y') : '....',
+            'remise.heure' => $date ? $date->format('H:i') : '...',
+            
+            'remise.qty_porte' => $qtyPorte ?: '..........',
+            'remise.qty_boite' => $qtyBoite ?: '..........',
+            'remise.qty_garage' => $qtyGarage ?: '..........',
+            'remise.autres_details' => $autresStr,
+            
+            'checkbox_porte' => $qtyPorte > 0 ? '☑' : '☐',
+            'checkbox_boite' => $qtyBoite > 0 ? '☑' : '☐',
+            'checkbox_garage' => $qtyGarage > 0 ? '☑' : '☐',
+            'checkbox_autre' => $qtyAutre > 0 ? '☑' : '☐',
+
+            'remise.remarques' => $remiseCle->remarques,
+            
+            'proprietaire.nom_complet' => $proprietaire ? $proprietaire->nom_complet : 'TGI',
+            
+            'locataire.nom_complet' => $locataire->nom_complet,
+            
+            'unite.type' => $unite->type_unite,
+            'unite.adresse' => $unite->adresse_complete,
+        ];
+
+        return response()->json([
+            'template' => $baseTemplate,
+            'variables' => $variables,
+            'template_key' => 'remise_cle_fr_v1'
+        ]);
+    }
+
+    public function renderPreview(Request $request, RemiseCle $remiseCle)
+    {
+        $this->authorize('view', [RemiseCle::class, $remiseCle->bail]);
+        
+        $content = $request->input('content');
+        $variables = $request->input('variables', []);
+
+        foreach ($variables as $key => $value) {
+            $content = str_replace('{{' . $key . '}}', $value ?? '', $content);
+            $content = str_replace('{{ ' . $key . ' }}', $value ?? '', $content);
+        }
+
+        return response()->json(['html' => $content]);
     }
 }

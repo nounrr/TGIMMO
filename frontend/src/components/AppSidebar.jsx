@@ -39,6 +39,7 @@ import {
   Receipt,
   CreditCard,
   BookOpen,
+  CircleDollarSign
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -91,22 +92,6 @@ export default function AppSidebar() {
 
   const menuItems = [
     {
-      title: 'Dashboard',
-      url: '/dashboard',
-      icon: LayoutDashboard,
-    },
-    {
-      title: 'Gestion Locative',
-      icon: Home,
-      items: [
-        { title: 'Mandats', url: '/mandats', icon: FileText, permission: PERMS.mandats.view },
-        { title: 'Avenants', url: '/avenants', icon: FilePlus, permission: PERMS.avenants.view },
-        { title: 'Baux', url: '/baux', icon: Briefcase, permission: PERMS.baux.view },
-        { title: 'Remises clés', url: '/remises-cles', icon: Key, permission: PERMS.remises_cles.view },
-        { title: 'Liquidations', url: '/liquidations', icon: FileText, permission: PERMS.liquidations.view },
-      ],
-    },
-    {
       title: 'Prospection',
       icon: UserCheck,
       items: [
@@ -115,50 +100,103 @@ export default function AppSidebar() {
       ],
     },
     {
+      title: 'Gestion Locative',
+      icon: Home,
+      items: [
+        { title: 'Propriétaires', url: '/proprietaires', icon: UserCog, permission: PERMS.proprietaires.view },
+        {
+          title: 'Mandats',
+          url: '/mandats',
+          icon: FileText,
+          permission: PERMS.mandats.view,
+          subItems: [
+             { title: 'Avenants', url: '/avenants', icon: FilePlus, permission: PERMS.avenants.view },
+          ]
+        },
+        { title: 'Unités', url: '/unites', icon: Building2, permission: PERMS.unites.view },
+        { title: 'Locataires', url: '/locataires', icon: Users, permission: PERMS.locataires.view },
+        {
+          title: 'Baux',
+          url: '/baux',
+          icon: Briefcase,
+          permission: PERMS.baux.view,
+          subItems: [
+             { title: 'Avenants', url: '/baux/avenants', icon: FilePlus, permission: PERMS.avenants.view },
+             { title: 'Remises clés', url: '/remises-cles', icon: Key, permission: PERMS.remises_cles.view },
+          ]
+        },
+      ],
+    },
+    {
+      title: 'Finance',
+      icon: Receipt,
+      items: [
+        { title: 'Liquidations', url: '/liquidations', icon: FileText, permission: PERMS.liquidations.view },
+        { title: 'Charges', url: '/charges', icon: CreditCard, permission: PERMS.charges.view },
+        { title: 'Baux - Paiements', url: '/paiements-locataires', icon: CircleDollarSign, permission: PERMS.paiements.view },
+      ],
+    },
+    {
       title: 'Maintenance',
       icon: Wrench,
       items: [
         { title: 'Préstataires', url: '/prestataires', icon: UserCog, permission: PERMS.prestataires.view },
-        { title: 'Réclamations', url: '/reclamations', icon: ClipboardList, permission: PERMS.reclamations.view },
-        { title: 'Types réclamations', url: '/reclamations/types', icon: Tag, permission: PERMS.reclamations.view },
+        {
+            title: 'Réclamations',
+            url: '/reclamations',
+            icon: ClipboardList,
+            permission: PERMS.reclamations.view,
+            subItems: [
+                { title: 'Types réclamations', url: '/reclamations/types', icon: Tag, permission: PERMS.reclamations.view },
+            ]
+        },
         { title: 'Interventions', url: '/interventions', icon: Wrench, permission: PERMS.interventions.view },
         { title: 'Devis', url: '/devis', icon: FileCheck, permission: PERMS.devis.view },
         { title: 'Factures', url: '/factures', icon: Receipt, permission: PERMS.factures.view },
-        { title: 'Charges', url: '/charges', icon: CreditCard, permission: PERMS.charges.view },
       ],
     },
     {
-      title: 'Contacts',
+      title: 'GED',
+      url: '/ged',
+      icon: FileText,
+    },
+    {
+      title: 'Utilisateur',
       icon: Users,
       items: [
-        { title: 'Locataires', url: '/locataires', icon: Users, permission: PERMS.locataires.view },
-        { title: 'Propriétaires', url: '/proprietaires', icon: UserCog, permission: PERMS.proprietaires.view },
+        { title: 'Employés', url: '/employes', icon: Users, permission: PERMS.users.view },
+        { title: 'Rôles & Permissions', url: '/roles-permissions', icon: Settings, permission: PERMS.roles.view },
       ],
     },
     {
-      title: 'Paramètres',
-      icon: Settings,
-      items: [
-        { title: 'Unités', url: '/unites', icon: Building2, permission: PERMS.unites.view },
-        { title: 'Employés', url: '/employes', icon: Users, permission: PERMS.users.view },
-        { title: 'Rôles & Permissions', url: '/roles-permissions', icon: Settings, permission: PERMS.roles.view },
-        { title: 'Guide', url: '/guide', icon: BookOpen },
-      ],
-    },
+      title: 'Guide',
+      url: '/guide',
+      icon: BookOpen,
+    }
   ];
 
   const filterMenuItems = (items) => {
     return items
       .map((item) => {
         if (item.items) {
-          const filteredSubItems = item.items.filter((subItem) => {
-            if (subItem.permission) {
-              return can(subItem.permission);
-            }
-            return true;
-          });
-          if (filteredSubItems.length === 0) return null;
-          return { ...item, items: filteredSubItems };
+          const filteredItems = item.items.map(subItem => {
+             if (subItem.subItems) {
+                 const filteredSubSubItems = subItem.subItems.filter(ssi => {
+                     if (ssi.permission) return can(ssi.permission);
+                     return true;
+                 });
+                 if (subItem.permission && !can(subItem.permission)) return null;
+                 return { ...subItem, subItems: filteredSubSubItems };
+             }
+             
+             if (subItem.permission) {
+                 return can(subItem.permission) ? subItem : null;
+             }
+             return subItem;
+          }).filter(Boolean);
+
+          if (filteredItems.length === 0) return null;
+          return { ...item, items: filteredItems };
         }
         if (item.permission) {
           return can(item.permission) ? item : null;
@@ -188,7 +226,7 @@ export default function AppSidebar() {
         {filteredMenuItems.map((item) => (
           <SidebarGroup key={item.title}>
             {item.items ? (
-              <Collapsible defaultOpen={false} className="group/collapsible">
+              <Collapsible defaultOpen={true} className="group/collapsible">
                 <SidebarGroupLabel asChild>
                   <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-2 hover:bg-accent rounded-md transition-colors">
                     <div className="flex items-center gap-2">
@@ -203,16 +241,44 @@ export default function AppSidebar() {
                     <SidebarMenu>
                       {item.items.map((subItem) => (
                         <SidebarMenuItem key={subItem.title}>
-                          <SidebarMenuButton
-                            asChild
-                            isActive={location.pathname === subItem.url}
-                            className={location.pathname === subItem.url ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'hover:bg-slate-100'}
-                          >
-                            <a href={subItem.url} onClick={(e) => { e.preventDefault(); navigate(subItem.url); }} className="flex items-center gap-2 py-2 px-3 rounded-md">
-                              <subItem.icon className="h-4 w-4" />
-                              <span className="text-sm">{subItem.title}</span>
-                            </a>
-                          </SidebarMenuButton>
+                          {subItem.subItems && subItem.subItems.length > 0 ? (
+                            <Collapsible className="group/subcollapsible">
+                                <SidebarMenuButton asChild>
+                                    <CollapsibleTrigger className="flex w-full items-center justify-between">
+                                        <div className="flex items-center gap-2" onClick={(e) => { if(subItem.url) { e.stopPropagation(); navigate(subItem.url); } }}>
+                                            {subItem.icon && <subItem.icon className="h-4 w-4" />}
+                                            <span>{subItem.title}</span>
+                                        </div>
+                                        <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]/subcollapsible:rotate-90" />
+                                    </CollapsibleTrigger>
+                                </SidebarMenuButton>
+                                <CollapsibleContent>
+                                    <SidebarMenuSub>
+                                        {subItem.subItems.map(ssi => (
+                                            <SidebarMenuSubItem key={ssi.title}>
+                                                <SidebarMenuSubButton asChild isActive={location.pathname === ssi.url}>
+                                                    <a href={ssi.url} onClick={(e) => { e.preventDefault(); navigate(ssi.url); }}>
+                                                        {ssi.icon && <ssi.icon className="h-3 w-3 mr-2" />}
+                                                        <span>{ssi.title}</span>
+                                                    </a>
+                                                </SidebarMenuSubButton>
+                                            </SidebarMenuSubItem>
+                                        ))}
+                                    </SidebarMenuSub>
+                                </CollapsibleContent>
+                            </Collapsible>
+                          ) : (
+                            <SidebarMenuButton
+                                asChild
+                                isActive={location.pathname === subItem.url}
+                                className={location.pathname === subItem.url ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'hover:bg-slate-100'}
+                            >
+                                <a href={subItem.url} onClick={(e) => { e.preventDefault(); navigate(subItem.url); }} className="flex items-center gap-2 py-2 rounded-md">
+                                    {subItem.icon && <subItem.icon className="h-4 w-4" />}
+                                    <span className="text-sm">{subItem.title}</span>
+                                </a>
+                            </SidebarMenuButton>
+                          )}
                         </SidebarMenuItem>
                       ))}
                     </SidebarMenu>

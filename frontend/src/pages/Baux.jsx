@@ -34,30 +34,6 @@ export default function Baux() {
 
   const onChange = (field, value) => setFilters(f => ({ ...f, [field]: value }));
 
-  const handleDownloadDocx = async (bailId) => {
-    try {
-      const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${base}/baux/${bailId}/docx`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error('Echec du téléchargement');
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      // Ouvrir dans un nouvel onglet et déclencher un téléchargement
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `bail_${bailId}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(blobUrl);
-    } catch (e) {
-      console.error(e);
-      alert("Impossible de télécharger le document du bail.");
-    }
-  };
-
   return (
     <div className="container-fluid" style={{ backgroundColor: '#fff', minHeight: '100vh' }}>
       <div className="p-3">
@@ -229,21 +205,6 @@ export default function Baux() {
                     <td className="px-2 py-2"><BailStatusBadge statut={b.statut} /></td>
                     <td className="text-center px-2 py-2">
                       <div className="d-flex justify-content-center gap-2">
-                        {can(PERMS.baux.download) && (
-                          <button 
-                            className="btn btn-sm rounded-3 border-0"
-                            style={{ width: '36px', height: '36px', padding: 0, background: '#dbeafe', color: '#1e40af', transition: 'all 0.2s' }}
-                            onClick={() => handleDownloadDocx(b.id)}
-                            title="Télécharger DOCX"
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#bfdbfe'; e.currentTarget.style.transform = 'scale(1.1)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.transform = 'scale(1)'; }}
-                          >
-                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-                            </svg>
-                          </button>
-                        )}
                         {can(PERMS.remises_cles.create) && (
                           <button
                             className="btn btn-sm rounded-3 border-0"

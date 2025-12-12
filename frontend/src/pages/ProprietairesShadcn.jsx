@@ -83,19 +83,21 @@ export default function ProprietairesShadcn() {
     prenom_ar: '',
     type_proprietaire: 'unique',
     statut: 'brouillon',
-    telephone: '',
+    telephone: [''],
     email: '',
+    rib: '',
     adresse: '',
     adresse_ar: '',
     cin: '',
     rc: '',
     ice: '',
     ifiscale: '',
+    ville: '',
     representant_nom: '',
     representant_fonction: '',
     representant_cin: '',
     taux_gestion_tgi_pct: '',
-    part_liquidation_pct: '',
+    taux_gestion: '',
     conditions_particulieres: '',
   });
 
@@ -110,7 +112,7 @@ export default function ProprietairesShadcn() {
   }), [page, perPage, searchTerm, selectedStatut, selectedType, sortBy, sortDir]);
 
   const { data, isLoading } = useGetProprietairesQuery(queryParams);
-  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
+  const meta = data || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -135,19 +137,23 @@ export default function ProprietairesShadcn() {
       prenom_ar: '',
       type_proprietaire: 'unique',
       statut: isCommercial ? 'en_negociation' : 'brouillon',
-      telephone: '',
+      telephone: [''],
       email: '',
+      rib: '',
       adresse: '',
       adresse_ar: '',
       cin: '',
       rc: '',
       ice: '',
       ifiscale: '',
+      ville: '',
       representant_nom: '',
       representant_fonction: '',
       representant_cin: '',
-      taux_gestion_tgi_pct: '',
-      part_liquidation_pct: '',
+      chiffre_affaires: '',
+      taux_gestion: '',
+      assiette_honoraires: 'loyers_encaisse',
+      periodicite_releve: 'mensuel',
       conditions_particulieres: '',
     });
     setShowFormModal(true);
@@ -162,19 +168,23 @@ export default function ProprietairesShadcn() {
       prenom_ar: proprietaire.prenom_ar || '',
       type_proprietaire: proprietaire.type_proprietaire || 'unique',
       statut: proprietaire.statut || 'brouillon',
-      telephone: proprietaire.telephone || '',
+      telephone: Array.isArray(proprietaire.telephone) ? proprietaire.telephone : (proprietaire.telephone ? [proprietaire.telephone] : ['']),
       email: proprietaire.email || '',
+      rib: proprietaire.rib || '',
       adresse: proprietaire.adresse || '',
       adresse_ar: proprietaire.adresse_ar || '',
       cin: proprietaire.cin || '',
       rc: proprietaire.rc || '',
       ice: proprietaire.ice || '',
       ifiscale: proprietaire.ifiscale || '',
+      ville: proprietaire.ville || '',
       representant_nom: proprietaire.representant_nom || '',
       representant_fonction: proprietaire.representant_fonction || '',
       representant_cin: proprietaire.representant_cin || '',
-      taux_gestion_tgi_pct: proprietaire.taux_gestion_tgi_pct || '',
-      part_liquidation_pct: proprietaire.part_liquidation_pct || '',
+      chiffre_affaires: proprietaire.chiffre_affaires || '',
+      taux_gestion: proprietaire.taux_gestion || '',
+      assiette_honoraires: proprietaire.assiette_honoraires || 'loyers_encaisse',
+      periodicite_releve: proprietaire.periodicite_releve || 'mensuel',
       conditions_particulieres: proprietaire.conditions_particulieres || '',
     });
     setShowFormModal(true);
@@ -345,6 +355,12 @@ export default function ProprietairesShadcn() {
                   <TableHead className="cursor-pointer" onClick={() => handleSort('statut')}>
                     Statut {sortBy === 'statut' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
                   </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('cin')}>
+                    CIN {sortBy === 'cin' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('chiffre_affaires')}>
+                    Capital Social {sortBy === 'chiffre_affaires' && <ArrowUpDown className="ml-2 h-4 w-4 inline" />}
+                  </TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -352,13 +368,13 @@ export default function ProprietairesShadcn() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       Chargement...
                     </TableCell>
                   </TableRow>
                 ) : data?.data?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Aucun propriétaire trouvé
                     </TableCell>
                   </TableRow>
@@ -375,13 +391,29 @@ export default function ProprietairesShadcn() {
                         {getStatutBadge(proprietaire.statut)}
                       </TableCell>
                       <TableCell>
+                        {proprietaire.cin || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {proprietaire.chiffre_affaires ? new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(proprietaire.chiffre_affaires) : '-'}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex flex-col text-sm">
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" /> {proprietaire.telephone || '-'}
+                          <span className="flex items-start gap-1">
+                            <Phone className="h-3 w-3 mt-1" /> 
+                            <div className="flex flex-col">
+                                {Array.isArray(proprietaire.telephone) ? proprietaire.telephone.map((tel, i) => (
+                                    <span key={i}>{tel}</span>
+                                )) : (proprietaire.telephone || '-')}
+                            </div>
                           </span>
                           <span className="flex items-center gap-1">
                             <Mail className="h-3 w-3" /> {proprietaire.email || '-'}
                           </span>
+                          {proprietaire.rib && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground" title="RIB">
+                              <CreditCard className="h-3 w-3" /> {proprietaire.rib}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -451,39 +483,45 @@ export default function ProprietairesShadcn() {
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <Label htmlFor="nom_raison">Nom / Raison sociale *</Label>
+                <Label htmlFor="nom_raison" className={errors.nom_raison ? "text-destructive" : ""}>Nom / Raison sociale *</Label>
                 <Input
                   id="nom_raison"
                   value={formData.nom_raison}
                   onChange={(e) => setFormData({ ...formData, nom_raison: e.target.value })}
                   required
+                  className={errors.nom_raison ? "border-destructive" : ""}
                 />
+                {errors.nom_raison && <p className="text-xs text-destructive mt-1">{errors.nom_raison[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="nom_ar">Nom (AR)</Label>
+                <Label htmlFor="nom_ar" className={errors.nom_ar ? "text-destructive" : ""}>Nom (AR)</Label>
                 <Input
                   id="nom_ar"
                   value={formData.nom_ar}
                   onChange={(e) => setFormData({ ...formData, nom_ar: e.target.value })}
                   dir="rtl"
+                  className={errors.nom_ar ? "border-destructive" : ""}
                 />
+                {errors.nom_ar && <p className="text-xs text-destructive mt-1">{errors.nom_ar[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="prenom_ar">Prénom (AR)</Label>
+                <Label htmlFor="prenom_ar" className={errors.prenom_ar ? "text-destructive" : ""}>Prénom (AR)</Label>
                 <Input
                   id="prenom_ar"
                   value={formData.prenom_ar}
                   onChange={(e) => setFormData({ ...formData, prenom_ar: e.target.value })}
                   dir="rtl"
+                  className={errors.prenom_ar ? "border-destructive" : ""}
                 />
+                {errors.prenom_ar && <p className="text-xs text-destructive mt-1">{errors.prenom_ar[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="type_proprietaire">Type de propriétaire</Label>
+                <Label htmlFor="type_proprietaire" className={errors.type_proprietaire ? "text-destructive" : ""}>Type de propriétaire</Label>
                 <Select
                   value={formData.type_proprietaire}
                   onValueChange={(value) => setFormData({ ...formData, type_proprietaire: value })}
                 >
-                  <SelectTrigger id="type_proprietaire">
+                  <SelectTrigger id="type_proprietaire" className={errors.type_proprietaire ? "border-destructive" : ""}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -494,14 +532,15 @@ export default function ProprietairesShadcn() {
                     <SelectItem value="autre">Autre</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.type_proprietaire && <p className="text-xs text-destructive mt-1">{errors.type_proprietaire[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="statut">Statut</Label>
+                <Label htmlFor="statut" className={errors.statut ? "text-destructive" : ""}>Statut</Label>
                 <Select
                   value={formData.statut}
                   onValueChange={(value) => setFormData({ ...formData, statut: value })}
                 >
-                  <SelectTrigger id="statut">
+                  <SelectTrigger id="statut" className={errors.statut ? "border-destructive" : ""}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -512,124 +551,242 @@ export default function ProprietairesShadcn() {
                     <SelectItem value="en_negociation">En négociation</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.statut && <p className="text-xs text-destructive mt-1">{errors.statut[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="telephone">Téléphone</Label>
-                <Input
-                  id="telephone"
-                  value={formData.telephone}
-                  onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                />
+                <Label className={errors.telephone ? "text-destructive" : ""}>Téléphone</Label>
+                {formData.telephone.map((tel, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      value={tel}
+                      onChange={(e) => {
+                        const newTelephone = [...formData.telephone];
+                        newTelephone[index] = e.target.value;
+                        setFormData({ ...formData, telephone: newTelephone });
+                      }}
+                      className={errors[`telephone.${index}`] ? "border-destructive" : ""}
+                      placeholder="Numéro de téléphone"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        const newTelephone = formData.telephone.filter((_, i) => i !== index);
+                        setFormData({ ...formData, telephone: newTelephone });
+                      }}
+                      disabled={formData.telephone.length === 1}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFormData({ ...formData, telephone: [...formData.telephone, ''] })}
+                  className="mt-1"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Ajouter un numéro
+                </Button>
+                {errors.telephone && <p className="text-xs text-destructive mt-1">{errors.telephone[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className={errors.email ? "text-destructive" : ""}>Email</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className={errors.email ? "border-destructive" : ""}
                 />
+                {errors.email && <p className="text-xs text-destructive mt-1">{errors.email[0]}</p>}
+              </div>
+              <div>
+                <Label htmlFor="rib" className={errors.rib ? "text-destructive" : ""}>RIB</Label>
+                <Input
+                  id="rib"
+                  value={formData.rib}
+                  onChange={(e) => setFormData({ ...formData, rib: e.target.value })}
+                  className={errors.rib ? "border-destructive" : ""}
+                  placeholder="24 chiffres"
+                  maxLength={24}
+                />
+                {errors.rib && <p className="text-xs text-destructive mt-1">{errors.rib[0]}</p>}
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="adresse">Adresse</Label>
+                <Label htmlFor="adresse" className={errors.adresse ? "text-destructive" : ""}>Adresse</Label>
                 <Input
                   id="adresse"
                   value={formData.adresse}
                   onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                  className={errors.adresse ? "border-destructive" : ""}
                 />
+                {errors.adresse && <p className="text-xs text-destructive mt-1">{errors.adresse[0]}</p>}
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="adresse_ar">Adresse (AR)</Label>
+                <Label htmlFor="adresse_ar" className={errors.adresse_ar ? "text-destructive" : ""}>Adresse (AR)</Label>
                 <Input
                   id="adresse_ar"
                   value={formData.adresse_ar}
                   onChange={(e) => setFormData({ ...formData, adresse_ar: e.target.value })}
                   dir="rtl"
+                  className={errors.adresse_ar ? "border-destructive" : ""}
                 />
+                {errors.adresse_ar && <p className="text-xs text-destructive mt-1">{errors.adresse_ar[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="cin">CIN</Label>
+                <Label htmlFor="cin" className={errors.cin ? "text-destructive" : ""}>CIN</Label>
                 <Input
                   id="cin"
                   value={formData.cin}
                   onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
+                  className={errors.cin ? "border-destructive" : ""}
                 />
+                {errors.cin && <p className="text-xs text-destructive mt-1">{errors.cin[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="rc">RC</Label>
+                <Label htmlFor="rc" className={errors.rc ? "text-destructive" : ""}>RC</Label>
                 <Input
                   id="rc"
                   value={formData.rc}
                   onChange={(e) => setFormData({ ...formData, rc: e.target.value })}
+                  className={errors.rc ? "border-destructive" : ""}
                 />
+                {errors.rc && <p className="text-xs text-destructive mt-1">{errors.rc[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="ice">ICE</Label>
+                <Label htmlFor="ice" className={errors.ice ? "text-destructive" : ""}>ICE</Label>
                 <Input
                   id="ice"
+                  maxLength={15}
+                  placeholder="15 chiffres"
                   value={formData.ice}
-                  onChange={(e) => setFormData({ ...formData, ice: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, ice: e.target.value.replace(/\D/g, '') })}
+                  className={errors.ice ? "border-destructive" : ""}
                 />
+                {errors.ice && <p className="text-xs text-destructive mt-1">{errors.ice[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="ifiscale">Identifiant Fiscal (IF)</Label>
+                <Label htmlFor="ifiscale" className={errors.ifiscale ? "text-destructive" : ""}>Identifiant Fiscal (IF)</Label>
                 <Input
                   id="ifiscale"
                   value={formData.ifiscale}
                   onChange={(e) => setFormData({ ...formData, ifiscale: e.target.value })}
+                  className={errors.ifiscale ? "border-destructive" : ""}
                 />
+                {errors.ifiscale && <p className="text-xs text-destructive mt-1">{errors.ifiscale[0]}</p>}
+              </div>
+              <div>
+                <Label htmlFor="ville" className={errors.ville ? "text-destructive" : ""}>Ville</Label>
+                <Input
+                  id="ville"
+                  value={formData.ville}
+                  onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
+                  className={errors.ville ? "border-destructive" : ""}
+                />
+                {errors.ville && <p className="text-xs text-destructive mt-1">{errors.ville[0]}</p>}
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="representant_nom">Représentant - Nom</Label>
+                <Label htmlFor="representant_nom" className={errors.representant_nom ? "text-destructive" : ""}>Représentant - Nom</Label>
                 <Input
                   id="representant_nom"
                   value={formData.representant_nom}
                   onChange={(e) => setFormData({ ...formData, representant_nom: e.target.value })}
+                  className={errors.representant_nom ? "border-destructive" : ""}
                 />
+                {errors.representant_nom && <p className="text-xs text-destructive mt-1">{errors.representant_nom[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="representant_fonction">Représentant - Fonction</Label>
+                <Label htmlFor="representant_fonction" className={errors.representant_fonction ? "text-destructive" : ""}>Représentant - Fonction</Label>
                 <Input
                   id="representant_fonction"
                   value={formData.representant_fonction}
                   onChange={(e) => setFormData({ ...formData, representant_fonction: e.target.value })}
+                  className={errors.representant_fonction ? "border-destructive" : ""}
                 />
+                {errors.representant_fonction && <p className="text-xs text-destructive mt-1">{errors.representant_fonction[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="representant_cin">Représentant - CIN</Label>
+                <Label htmlFor="representant_cin" className={errors.representant_cin ? "text-destructive" : ""}>Représentant - CIN</Label>
                 <Input
                   id="representant_cin"
                   value={formData.representant_cin}
                   onChange={(e) => setFormData({ ...formData, representant_cin: e.target.value })}
+                  className={errors.representant_cin ? "border-destructive" : ""}
                 />
+                {errors.representant_cin && <p className="text-xs text-destructive mt-1">{errors.representant_cin[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="taux_gestion_tgi_pct">Taux de gestion TGI (%)</Label>
+                <Label htmlFor="chiffre_affaires" className={errors.chiffre_affaires ? "text-destructive" : ""}>Capital Social</Label>
                 <Input
-                  id="taux_gestion_tgi_pct"
+                  id="chiffre_affaires"
                   type="number"
+                  onWheel={(e) => e.target.blur()}
                   step="0.01"
-                  value={formData.taux_gestion_tgi_pct}
-                  onChange={(e) => setFormData({ ...formData, taux_gestion_tgi_pct: e.target.value })}
+                  value={formData.chiffre_affaires}
+                  onChange={(e) => setFormData({ ...formData, chiffre_affaires: e.target.value })}
+                  className={errors.chiffre_affaires ? "border-destructive" : ""}
                 />
+                {errors.chiffre_affaires && <p className="text-xs text-destructive mt-1">{errors.chiffre_affaires[0]}</p>}
               </div>
               <div>
-                <Label htmlFor="part_liquidation_pct">Part de liquidation (%)</Label>
+                <Label htmlFor="taux_gestion" className={errors.taux_gestion ? "text-destructive" : ""}>Taux des honoraires</Label>
                 <Input
-                  id="part_liquidation_pct"
+                  id="taux_gestion"
                   type="number"
+                  onWheel={(e) => e.target.blur()}
                   step="0.01"
-                  value={formData.part_liquidation_pct}
-                  onChange={(e) => setFormData({ ...formData, part_liquidation_pct: e.target.value })}
+                  value={formData.taux_gestion}
+                  onChange={(e) => setFormData({ ...formData, taux_gestion: e.target.value })}
+                  className={errors.taux_gestion ? "border-destructive" : ""}
                 />
+                {errors.taux_gestion && <p className="text-xs text-destructive mt-1">{errors.taux_gestion[0]}</p>}
+              </div>
+              <div>
+                <Label htmlFor="assiette_honoraires" className={errors.assiette_honoraires ? "text-destructive" : ""}>Assiette honoraires</Label>
+                <Select
+                  value={formData.assiette_honoraires}
+                  onValueChange={(value) => setFormData({ ...formData, assiette_honoraires: value })}
+                >
+                  <SelectTrigger id="assiette_honoraires" className={errors.assiette_honoraires ? "border-destructive" : ""}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="loyers_encaisse">Loyers encaissés</SelectItem>
+                    <SelectItem value="loyers_factures">Loyers émis</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.assiette_honoraires && <p className="text-xs text-destructive mt-1">{errors.assiette_honoraires[0]}</p>}
+              </div>
+              <div>
+                <Label htmlFor="periodicite_releve" className={errors.periodicite_releve ? "text-destructive" : ""}>Périodicité relevé</Label>
+                <Select
+                  value={formData.periodicite_releve}
+                  onValueChange={(value) => setFormData({ ...formData, periodicite_releve: value })}
+                >
+                  <SelectTrigger id="periodicite_releve" className={errors.periodicite_releve ? "border-destructive" : ""}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensuel">Mensuel</SelectItem>
+                    <SelectItem value="trimestriel">Trimestriel</SelectItem>
+                    <SelectItem value="semestriel">Semestriel</SelectItem>
+                    <SelectItem value="annuel">Annuel</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.periodicite_releve && <p className="text-xs text-destructive mt-1">{errors.periodicite_releve[0]}</p>}
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="conditions_particulieres">Conditions particulières</Label>
+                <Label htmlFor="conditions_particulieres" className={errors.conditions_particulieres ? "text-destructive" : ""}>Conditions particulières</Label>
                 <Input
                   id="conditions_particulieres"
                   value={formData.conditions_particulieres}
                   onChange={(e) => setFormData({ ...formData, conditions_particulieres: e.target.value })}
+                  className={errors.conditions_particulieres ? "border-destructive" : ""}
                 />
+                {errors.conditions_particulieres && <p className="text-xs text-destructive mt-1">{errors.conditions_particulieres[0]}</p>}
               </div>
             </div>
             <DialogFooter className="gap-2">

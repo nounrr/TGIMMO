@@ -54,7 +54,7 @@ class AvenantMandatController extends Controller
         }
 
         if ($sortBy = $request->query('sort_by')) {
-            $direction = $request->query('order', 'asc');
+            $direction = strtolower($request->query('order', 'asc')) === 'desc' ? 'desc' : 'asc';
             // Security check to prevent SQL injection via column names
             if (in_array($sortBy, ['created_at', 'updated_at', 'reference', 'objet_resume', 'date_effet'])) {
                 $query->orderBy($sortBy, $direction);

@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasDocuments;
 
 class Reclamation extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDocuments;
 
     protected $fillable = [
-        'bail_id', 'reclamation_type_id', 'description', 'source', 'status'
+        'unite_id', 'reclamation_type_id', 'description', 'source', 'status'
     ];
 
     protected $casts = [
@@ -18,9 +19,9 @@ class Reclamation extends Model
         'updated_at' => 'datetime',
     ];
 
-    public function bail()
+    public function unite()
     {
-        return $this->belongsTo(Bail::class, 'bail_id');
+        return $this->belongsTo(Unite::class, 'unite_id');
     }
 
     public function type()

@@ -20,6 +20,7 @@ import { MessageSquare, Plus, User, Trash2, Filter, RefreshCw, FileText, Pencil,
 import { AudioRecorder } from '../components/AudioRecorder';
 import { MiniAudioPlayer } from '../components/MiniAudioPlayer';
 import { PaginationControl } from '@/components/PaginationControl';
+import ProprietaireFormDialog from '@/components/ProprietaireFormDialog';
 
 export default function ApprochesProprietairesShadcn() {
   const [filters, setFilters] = useState({ proprietaire_id: '' });
@@ -47,6 +48,7 @@ export default function ApprochesProprietairesShadcn() {
   const [audioBlob, setAudioBlob] = useState(null);
   const [existingAudioUrl, setExistingAudioUrl] = useState(null);
   const [formKey, setFormKey] = useState(0);
+  const [showProprietaireDialog, setShowProprietaireDialog] = useState(false);
   
   const [filterProprietaire, setFilterProprietaire] = useState(null);
   const { can, permissions, user } = useAuthz();
@@ -222,19 +224,33 @@ export default function ApprochesProprietairesShadcn() {
                     <User className="h-4 w-4 text-primary" />
                     Propriétaire <span className="text-red-500">*</span>
                   </Label>
-                  <Select
-                    value={selectedProprietaire}
-                    onChange={setSelectedProprietaire}
-                    options={proprietaireOptions}
-                    styles={customSelectStyles}
-                    placeholder="Rechercher un propriétaire..."
-                    isClearable
-                    isSearchable
-                    noOptionsMessage={() => "Aucun propriétaire trouvé"}
-                    loadingMessage={() => "Chargement..."}
-                    className="react-select-container"
-                    classNamePrefix="react-select"
-                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1 min-w-0">
+                      <Select
+                        value={selectedProprietaire}
+                        onChange={setSelectedProprietaire}
+                        options={proprietaireOptions}
+                        styles={customSelectStyles}
+                        placeholder="Rechercher un propriétaire..."
+                        isClearable
+                        isSearchable
+                        noOptionsMessage={() => "Aucun propriétaire trouvé"}
+                        loadingMessage={() => "Chargement..."}
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                      />
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="default" 
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => setShowProprietaireDialog(true)}
+                      title="Nouveau propriétaire"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                   {selectedProprietaire && (
                     <div className="mt-2 p-2 bg-slate-50 rounded-md flex items-center gap-2 border">
                       <div className="bg-primary/10 rounded-full p-2 h-8 w-8 flex items-center justify-center">
@@ -482,6 +498,19 @@ export default function ApprochesProprietairesShadcn() {
           to={meta.to}
         />
       </Card>
+
+      <ProprietaireFormDialog 
+        open={showProprietaireDialog} 
+        onOpenChange={setShowProprietaireDialog}
+        onSuccess={(newProprietaire) => {
+          const label = newProprietaire.nom_raison || [newProprietaire.prenom, newProprietaire.nom].filter(Boolean).join(' ') || `Propriétaire #${newProprietaire.id}`;
+          setSelectedProprietaire({
+            value: newProprietaire.id,
+            label: label,
+            data: newProprietaire
+          });
+        }}
+      />
     </div>
   );
 }

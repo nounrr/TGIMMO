@@ -25,7 +25,13 @@ foreach ($payments as $p) {
     if ($bail) {
         echo "  -> Bail found. Unite ID: {$bail->unite_id}\n";
         
-        $owners = DB::table('unites_proprietaires')->where('unite_id', $bail->unite_id)->get();
+        // $owners = DB::table('unites_proprietaires')->where('unite_id', $bail->unite_id)->get();
+// Updated to use MandatGestion
+$mandat = \App\Models\MandatGestion::where('unite_id', $bail->unite_id)
+    ->where('statut', 'actif')
+    ->latest('id')
+    ->first();
+$owners = $mandat ? $mandat->unitesProprietaires : collect([]);
         echo "  -> Owners count: " . $owners->count() . "\n";
         foreach ($owners as $o) {
             echo "    -> Owner ID: {$o->proprietaire_id}\n";
@@ -37,7 +43,11 @@ foreach ($payments as $p) {
 
 $ownersWithPayments = DB::table('bail_paiements')
     ->join('baux', 'bail_paiements.bail_id', '=', 'baux.id')
-    ->join('unites_proprietaires', 'baux.unite_id', '=', 'unites_proprietaires.unite_id')
+    ->join('mandats_gestion', function($join) {
+        $join->on('baux.unite_id', '=', 'mandats_gestion.unite_id')
+             ->where('mandats_gestion.statut', '=', 'actif');
+    })
+    ->join('unites_proprietaires', 'mandats_gestion.id', '=', 'unites_proprietaires.mandat_id')
     ->where('bail_paiements.period_month', $month)
     ->where('bail_paiements.period_year', $year)
     ->where('bail_paiements.status', 'valide')

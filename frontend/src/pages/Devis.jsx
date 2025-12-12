@@ -77,6 +77,7 @@ export default function Devis() {
               </label>
               <input 
                 type="number" 
+                onWheel={(e) => e.target.blur()}
                 className="form-control form-control-lg border-2" 
                 value={prestataireId} 
                 onChange={e=>setPrestataireId(e.target.value)} 
@@ -89,6 +90,7 @@ export default function Devis() {
               </label>
               <input 
                 type="number" 
+                onWheel={(e) => e.target.blur()}
                 className="form-control form-control-lg border-2" 
                 value={interventionId} 
                 onChange={e=>setInterventionId(e.target.value)} 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useGetLocatairesQuery } from '../features/locataires/locatairesApi';
 import { useGetUnitesQuery } from '../features/unites/unitesApi';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -8,6 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { useToast } from "@/hooks/use-toast";
+import BailDocEditor from '../components/BailDocEditor';
+import BailResiliationEditor from '../components/BailResiliationEditor';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useGetBauxQuery } from '../api/baseApi';
 
 const empty = {
   numero_bail: '',
@@ -27,9 +32,17 @@ const empty = {
 };
 
 export default function BailForm({ initialValue, onSubmit, saving }) {
+  const { toast } = useToast();
   const [form, setForm] = useState(empty);
   const [locSearch, setLocSearch] = useState('');
   const [uniteSearch, setUniteSearch] = useState('');
+  const editorRef = useRef(null);
+  const [periodConflict, setPeriodConflict] = useState(null); // { message, bail } | null
+  const [dateOrderError, setDateOrderError] = useState('');
+  
+  const [showResiliationModal, setShowResiliationModal] = useState(false);
+  const [resiliationData, setResiliationData] = useState({});
+  const resiliationEditorRef = useRef(null);
 
   // Fetch locataires and unités for selects
   // Use 'search' param consumed by hook (translates to ?q=)
@@ -39,16 +52,148 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
   const { data: uniteData } = useGetUnitesQuery({ search: uniteSearch, per_page: 50, statut: 'vacant' });
   const unites = uniteData?.data || uniteData || [];
 
+  // Fetch existing baux for selected unit to check overlap
+  const { data: bauxData } = useGetBauxQuery(
+    form.unite_id ? { unite_id: form.unite_id, per_page: 100, sort_by: 'date_debut', sort_dir: 'desc' } : undefined,
+    { skip: !form.unite_id }
+  );
+  const bauxUnite = bauxData?.data || bauxData || [];
+
   useEffect(() => {
     if (initialValue) {
-      setForm({ ...empty, ...initialValue });
+      const data = { ...empty, ...initialValue };
+      
+      // Robust normalization for mode_paiement
+      let mp = String(data.mode_paiement || '').toLowerCase().trim();
+      // Handle variations/typos
+      if (mp.includes('espece') || mp.includes('espéce') || mp.includes('espèces')) {
+        data.mode_paiement = 'especes';
+      } else if (mp.includes('cheque') || mp.includes('chèque')) {
+        data.mode_paiement = 'cheque';
+      } else if (mp.includes('virement')) {
+        data.mode_paiement = 'virement';
+      } else {
+        // Default fallback if empty or unrecognized
+        data.mode_paiement = 'virement';
+      }
+
+      setForm(data);
+
+      if (initialValue.locataire_id) {
+        const loc = locataires.find(l => l.id === Number(initialValue.locataire_id));
+        setLocSearch(loc ? (loc.nom ? `${loc.nom} ${loc.prenom || ''}`.trim() : loc.raison_sociale || '') : '');
+      }
+      if (initialValue.unite_id) {
+        const u = unites.find(u => u.id === Number(initialValue.unite_id));
+        setUniteSearch(u ? (u.numero_unite || u.adresse_complete || '') : '');
+      }
     }
   }, [initialValue]);
 
   const onChange = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const submit = (e) => {
+  // Helper: compute duration in months between two dates
+  const computeMonths = (startStr, endStr) => {
+    if (!startStr || !endStr) return '';
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return '';
+    let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+    if (end.getDate() >= start.getDate()) months += 1;
+    return String(months > 0 ? months : '');
+  };
+
+  // Auto-calculate duration when both dates are set
+  useEffect(() => {
+    if (form.date_debut && form.date_fin) {
+      const m = computeMonths(form.date_debut, form.date_fin);
+      if ((form.duree || '') !== (m || '')) {
+        setForm(f => ({ ...f, duree: m }));
+      }
+      const start = new Date(form.date_debut);
+      const end = new Date(form.date_fin);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end < start) {
+        setDateOrderError('La date de fin doit être postérieure à la date de début.');
+      } else {
+        setDateOrderError('');
+      }
+    }
+    // If date_fin is cleared, also clear duration
+    if (form.date_debut && !form.date_fin && form.duree) {
+      setForm(f => ({ ...f, duree: '' }));
+    }
+    if (form.date_debut && !form.date_fin) {
+      setDateOrderError('');
+    }
+  }, [form.date_debut, form.date_fin]);
+
+  // Check overlap with existing baux for the selected unit
+  useEffect(() => {
+    if (!form.unite_id || !form.date_debut) {
+      setPeriodConflict(null);
+      return;
+    }
+    // In edit mode: if dates are unchanged compared to the current bail, don't flag conflict
+    if (initialValue?.id && String(initialValue.unite_id) === String(form.unite_id) &&
+        initialValue.date_debut === form.date_debut && (initialValue.date_fin || '') === (form.date_fin || '')) {
+      setPeriodConflict(null);
+      return;
+    }
+    const start = new Date(form.date_debut);
+    const end = form.date_fin ? new Date(form.date_fin) : null;
+    const endTime = end ? end.getTime() : Number.POSITIVE_INFINITY;
+    if (Number.isNaN(start.getTime())) {
+      setPeriodConflict(null);
+      return;
+    }
+    const conflicts = (Array.isArray(bauxUnite) ? bauxUnite : [])
+      .filter(b => !initialValue?.id || String(b.id) !== String(initialValue.id))
+      .filter(b => ['actif', 'en_attente'].includes(b.statut))
+      .filter(b => {
+        const bStart = b.date_debut ? new Date(b.date_debut) : null;
+        const bEnd = b.date_fin ? new Date(b.date_fin) : null;
+        if (!bStart) return false;
+        const bStartTime = bStart.getTime();
+        const bEndTime = bEnd ? bEnd.getTime() : Number.POSITIVE_INFINITY;
+        return bStartTime <= endTime && (bEndTime >= start.getTime());
+      });
+    if (conflicts.length > 0) {
+      const c = conflicts[0];
+      const startStr = c.date_debut ? new Date(c.date_debut).toLocaleDateString() : '';
+      const endStr = c.date_fin ? new Date(c.date_fin).toLocaleDateString() : '—';
+      const msg = `Conflit: bail ${c.numero_bail || c.id} (${c.statut}) du ${startStr} au ${endStr}.`;
+      setPeriodConflict({ message: msg, bail: c });
+    } else {
+      setPeriodConflict(null);
+    }
+  }, [form.unite_id, form.date_debut, form.date_fin, bauxUnite, initialValue?.id]);
+
+  const handleResiliationConfirm = async () => {
+    if (resiliationEditorRef.current) {
+        const data = await resiliationEditorRef.current.getContent();
+        setResiliationData(data);
+        setShowResiliationModal(false);
+        toast({ title: "Document de résiliation prêt à être enregistré." });
+    }
+  };
+
+  const submit = async (e) => {
     e.preventDefault();
+
+    if (!form.locataire_id) {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez sélectionner un locataire valide dans la liste.' });
+      return;
+    }
+    if (!form.unite_id) {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez sélectionner une unité valide dans la liste.' });
+      return;
+    }
+
+    let docData = {};
+    if (editorRef.current) {
+        docData = await editorRef.current.getContent();
+    }
+
     const payload = {
       numero_bail: form.numero_bail || undefined,
       locataire_id: form.locataire_id,
@@ -64,6 +209,8 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
       clause_particuliere: form.clause_particuliere || undefined,
       observations: form.observations || undefined,
       statut: form.statut || undefined,
+      ...docData,
+      ...resiliationData
     };
     onSubmit && onSubmit(payload);
   };
@@ -114,27 +261,50 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
                   list="locataires-list"
                   className="pl-8"
                   placeholder="Rechercher et sélectionner un locataire..."
-                  value={form.locataire_id ? (mergedLocataires?.find(l => String(l.id) === String(form.locataire_id))?.prenom ? `${mergedLocataires?.find(l => String(l.id) === String(form.locataire_id))?.prenom} ${mergedLocataires?.find(l => String(l.id) === String(form.locataire_id))?.nom || ''}`.trim() : (mergedLocataires?.find(l => String(l.id) === String(form.locataire_id))?.raison_sociale || '')) : locSearch}
+                  value={form.locataire_id ? (() => {
+                    const l = mergedLocataires?.find(l => String(l.id) === String(form.locataire_id));
+                    if (!l) return '';
+                    const isSociete = l.type_personne === 'societe' || (!l.type_personne && !!l.raison_sociale);
+                    return isSociete ? (l.raison_sociale || '') : `${l.nom || ''} ${l.prenom || ''}`.trim();
+                  })() : locSearch}
                   onChange={(e) => {
                     setLocSearch(e.target.value);
                     const match = mergedLocataires?.find(l => {
-                      const name = l.prenom ? `${l.prenom} ${l.nom || ''}`.trim() : (l.raison_sociale || l.email || `#${l.id}`);
+                      const isSociete = l.type_personne === 'societe' || (!l.type_personne && !!l.raison_sociale);
+                      const name = isSociete ? (l.raison_sociale || '') : `${l.nom || ''} ${l.prenom || ''}`.trim();
                       return name === e.target.value;
                     });
-                    if (match) onChange('locataire_id', match.id); else if (!e.target.value) onChange('locataire_id', '');
+                    if (match) onChange('locataire_id', match.id); else onChange('locataire_id', '');
                   }}
                   required
                 />
                 <datalist id="locataires-list">
-                  {mergedLocataires?.map(l => (
-                    <option key={l.id} value={l.prenom ? `${l.prenom} ${l.nom || ''}`.trim() : (l.raison_sociale || l.email || `#${l.id}`)}>
-                      {l.email && `(${l.email})`}
-                    </option>
-                  ))}
+                  {mergedLocataires?.map(l => {
+                    const isSociete = l.type_personne === 'societe' || (!l.type_personne && !!l.raison_sociale);
+                    const name = isSociete ? (l.raison_sociale || '') : `${l.nom || ''} ${l.prenom || ''}`.trim();
+                    const identifier = isSociete ? (l.ice ? `ICE: ${l.ice}` : '') : (l.cin ? `CIN: ${l.cin}` : '');
+                    return (
+                      <option key={l.id} value={name}>
+                        {identifier && `(${identifier})`}
+                      </option>
+                    );
+                  })}
                 </datalist>
               </div>
-              {form.locataire_id && (
-                <div className="text-xs text-indigo-700">Sélectionné: {mergedLocataires?.find(l => String(l.id) === String(form.locataire_id))?.prenom} {mergedLocataires?.find(l => String(l.id) === String(form.locataire_id))?.nom}</div>
+              {form.locataire_id && (() => {
+                const l = mergedLocataires?.find(l => String(l.id) === String(form.locataire_id));
+                if (!l) return null;
+                const isSociete = l.type_personne === 'societe' || (!l.type_personne && !!l.raison_sociale);
+                const name = isSociete ? (l.raison_sociale || '') : `${l.nom || ''} ${l.prenom || ''}`.trim();
+                const identifier = isSociete ? (l.ice ? `ICE: ${l.ice}` : '') : (l.cin ? `CIN: ${l.cin}` : '');
+                return (
+                  <div className="text-xs text-indigo-700">
+                    Sélectionné: {name} {identifier && `(${identifier})`}
+                  </div>
+                );
+              })()}
+              {locSearch && !form.locataire_id && (
+                <div className="text-xs text-red-500">Veuillez sélectionner une option de la liste</div>
               )}
             </div>
             <div className="space-y-1">
@@ -151,7 +321,7 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
                       const ref = u.reference || u.numero_unite || `#${u.id}`;
                       return ref === e.target.value;
                     });
-                    if (match) onSelectUnite(match.id); else if (!e.target.value) onSelectUnite('');
+                    if (match) onSelectUnite(match.id); else onSelectUnite('');
                   }}
                   required
                 />
@@ -165,6 +335,9 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
               </div>
               {form.unite_id && (
                 <div className="text-xs text-emerald-700">Sélectionné: {mergedUnites?.find(u => String(u.id) === String(form.unite_id))?.numero_unite}</div>
+              )}
+              {uniteSearch && !form.unite_id && (
+                <div className="text-xs text-red-500">Veuillez sélectionner une option de la liste</div>
               )}
               <div className="text-xs text-slate-500">Seules les unités vacantes sont listées</div>
             </div>
@@ -209,15 +382,45 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Date début <span className="text-red-500">*</span></Label>
               <Input type="date" value={form.date_debut} onChange={e => onChange('date_debut', e.target.value)} required />
+              {periodConflict && (
+                <div className="text-xs text-red-600 mt-1">
+                  {periodConflict.message} {periodConflict.bail?.id && (
+                    <a href={`/baux/${periodConflict.bail.id}`} className="underline text-red-700" target="_blank" rel="noreferrer">Voir</a>
+                  )}
+                </div>
+              )}
+              {dateOrderError && (
+                <div className="text-xs text-red-600 mt-1">{dateOrderError}</div>
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Date fin</Label>
               <Input type="date" value={form.date_fin || ''} onChange={e => onChange('date_fin', e.target.value)} />
               <div className="text-xs text-slate-500">Optionnel si renouvellement auto</div>
+              {periodConflict && (
+                <div className="text-xs text-red-600 mt-1">
+                  {periodConflict.message} {periodConflict.bail?.id && (
+                    <a href={`/baux/${periodConflict.bail.id}`} className="underline text-red-700" target="_blank" rel="noreferrer">Voir</a>
+                  )}
+                </div>
+              )}
+              {dateOrderError && (
+                <div className="text-xs text-red-600 mt-1">{dateOrderError}</div>
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Durée (mois)</Label>
-              <Input type="number" value={form.duree} onChange={e => onChange('duree', e.target.value)} placeholder="Ex: 12" />
+              <Input
+                type="number"
+                onWheel={(e) => e.target.blur()}
+                value={form.duree}
+                onChange={e => onChange('duree', e.target.value)}
+                placeholder="Ex: 12"
+                readOnly={Boolean(form.date_debut && form.date_fin)}
+              />
+              {form.date_debut && form.date_fin && (
+                <div className="text-xs text-slate-500">Calculé automatiquement à partir des dates</div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -231,28 +434,34 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Loyer mensuel <span className="text-red-500">*</span></Label>
               <div className="flex">
-                <Input type="number" step="0.01" value={form.montant_loyer} onChange={e => onChange('montant_loyer', e.target.value)} placeholder="0.00" className="rounded-r-none" required />
+                <Input type="number" onWheel={(e) => e.target.blur()} step="0.01" value={form.montant_loyer} onChange={e => onChange('montant_loyer', e.target.value)} placeholder="0.00" className="rounded-r-none" required />
                 <span className="inline-flex items-center px-3 border border-l-0 rounded-r bg-emerald-50 text-emerald-700">MAD</span>
               </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Charges mensuelles</Label>
               <div className="flex">
-                <Input type="number" step="0.01" value={form.charges} onChange={e => onChange('charges', e.target.value)} placeholder="0.00" className="rounded-r-none" />
+                <Input type="number" onWheel={(e) => e.target.blur()} step="0.01" value={form.charges} onChange={e => onChange('charges', e.target.value)} placeholder="0.00" className="rounded-r-none" />
                 <span className="inline-flex items-center px-3 border border-l-0 rounded-r bg-sky-50 text-sky-700">MAD</span>
               </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Dépôt de garantie</Label>
               <div className="flex">
-                <Input type="number" step="0.01" value={form.depot_garantie} onChange={e => onChange('depot_garantie', e.target.value)} placeholder="0.00" className="rounded-r-none" />
+                <Input type="number" onWheel={(e) => e.target.blur()} step="0.01" value={form.depot_garantie} onChange={e => onChange('depot_garantie', e.target.value)} placeholder="0.00" className="rounded-r-none" />
                 <span className="inline-flex items-center px-3 border border-l-0 rounded-r bg-amber-50 text-amber-700">MAD</span>
               </div>
             </div>
             <div className="space-y-1 md:col-span-2">
               <Label className="text-xs font-semibold">Mode de paiement</Label>
-              <Select value={form.mode_paiement} onValueChange={(v) => onChange('mode_paiement', v)}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <Select 
+                key={initialValue?.id || 'new'} 
+                value={form.mode_paiement} 
+                onValueChange={(v) => onChange('mode_paiement', v)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sélectionner..." />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="virement">Virement bancaire</SelectItem>
                   <SelectItem value="cheque">Chèque</SelectItem>
@@ -295,25 +504,57 @@ export default function BailForm({ initialValue, onSubmit, saving }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label className="text-xs font-semibold">Statut</Label>
-              <Select value={form.statut} onValueChange={(v) => onChange('statut', v)}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en_attente">En attente</SelectItem>
-                  <SelectItem value="actif">Actif</SelectItem>
-                  <SelectItem value="resilie">Résilié</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={form.statut} onValueChange={(v) => {
+                  onChange('statut', v);
+                  if (v === 'resilie') setShowResiliationModal(true);
+                }}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en_attente">En attente</SelectItem>
+                    <SelectItem value="actif">Actif</SelectItem>
+                    <SelectItem value="resilie">Résilié</SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.statut === 'resilie' && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowResiliationModal(true)}>
+                    Éditer Acte
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Section Editor (Only in Edit Mode) */}
+      {initialValue?.id && (
+        <div className="mt-6">
+            <BailDocEditor ref={editorRef} bail={initialValue} />
+        </div>
+      )}
+
       {/* Submit */}
       <div className="flex justify-end">
-        <Button type="submit" disabled={!!saving} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+        <Button type="submit" disabled={!!saving || !!periodConflict || !!dateOrderError} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
           {saving ? 'Enregistrement...' : 'Enregistrer le bail'}
         </Button>
       </div>
+
+      <Dialog open={showResiliationModal} onOpenChange={setShowResiliationModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Acte de Résiliation</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+             <BailResiliationEditor ref={resiliationEditorRef} bail={initialValue} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowResiliationModal(false)}>Annuler</Button>
+            <Button onClick={handleResiliationConfirm}>Confirmer et Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

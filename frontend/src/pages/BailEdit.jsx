@@ -7,10 +7,11 @@ import useAuthz from '../hooks/useAuthz';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileText, KeyRound, FileDown, ArrowLeft, Pencil } from 'lucide-react';
+import { FileText, KeyRound, ArrowLeft, Pencil } from 'lucide-react';
 import BailPaymentsGrid from '../components/BailPaymentsGrid';
 import BailChargesSummary from '../components/BailChargesSummary';
 import BailChargesSquares from '../components/BailChargesSquares';
+import BailFranchiseManager from '../components/BailFranchiseManager';
 
 export default function BailEdit() {
   const { id } = useParams();
@@ -32,18 +33,6 @@ export default function BailEdit() {
       console.error(e);
       alert('Erreur lors de la mise à jour du bail');
     }
-  };
-
-  const handleDownloadDocx = async () => {
-    try {
-      const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${base}/baux/${id}/docx`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-      if (!res.ok) throw new Error('Echec du téléchargement');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `bail_${id}.docx`; document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
-    } catch (e) { console.error(e); alert("Impossible de télécharger le document du bail."); }
   };
 
   if (!bail && isLoading) {
@@ -83,9 +72,6 @@ export default function BailEdit() {
           <Link to={`/baux/${id}/charges`}>
             <Button variant="outline" className="gap-2" type="button"><FileText className="h-4 w-4" /> Charges mensuelles</Button>
           </Link>
-          {can(PERMS.baux.download) && (
-            <Button onClick={handleDownloadDocx} className="gap-2 bg-emerald-600 hover:bg-emerald-700" type="button"><FileDown className="h-4 w-4" /> DOCX</Button>
-          )}
         </div>
       </div>
 
@@ -100,6 +86,14 @@ export default function BailEdit() {
             <div className="space-y-1"><div className="text-slate-500">Propriétaire</div><div className="font-medium">{bail.unite?.proprietaires?.map(p => p.nom_complet).join(', ') || '—'}</div></div>
             <div className="space-y-1"><div className="text-slate-500">Loyer total</div><div className="font-medium text-emerald-700">{bail.loyer_total} MAD</div></div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Franchises de loyer */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm font-semibold">Franchises de loyer</CardTitle></CardHeader>
+        <CardContent>
+          <BailFranchiseManager bailId={bail.id} />
         </CardContent>
       </Card>
 

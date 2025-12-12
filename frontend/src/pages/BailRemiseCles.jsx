@@ -168,7 +168,7 @@ export default function BailRemiseCles() {
                         </div>
                       </div>
                       <div className="col-auto col-sm-4 col-md-3">
-                        <input type="number" min="0" step="1" className="form-control" placeholder="Qté" value={portes.nombre} onChange={e => setPortes(p => ({ ...p, nombre: e.target.value }))} disabled={!portes.checked} />
+                        <input type="number" onWheel={(e) => e.target.blur()} min="0" step="1" className="form-control" placeholder="Qté" value={portes.nombre} onChange={e => setPortes(p => ({ ...p, nombre: e.target.value }))} disabled={!portes.checked} />
                       </div>
                     </div>
                     <div className="row g-2 align-items-center">
@@ -179,7 +179,7 @@ export default function BailRemiseCles() {
                         </div>
                       </div>
                       <div className="col-auto col-sm-4 col-md-3">
-                        <input type="number" min="0" step="1" className="form-control" placeholder="Qté" value={boites.nombre} onChange={e => setBoites(p => ({ ...p, nombre: e.target.value }))} disabled={!boites.checked} />
+                        <input type="number" onWheel={(e) => e.target.blur()} min="0" step="1" className="form-control" placeholder="Qté" value={boites.nombre} onChange={e => setBoites(p => ({ ...p, nombre: e.target.value }))} disabled={!boites.checked} />
                       </div>
                     </div>
                     <div className="row g-2 align-items-center">
@@ -190,7 +190,7 @@ export default function BailRemiseCles() {
                         </div>
                       </div>
                       <div className="col-auto col-sm-4 col-md-3">
-                        <input type="number" min="0" step="1" className="form-control" placeholder="Qté" value={portails.nombre} onChange={e => setPortails(p => ({ ...p, nombre: e.target.value }))} disabled={!portails.checked} />
+                        <input type="number" onWheel={(e) => e.target.blur()} min="0" step="1" className="form-control" placeholder="Qté" value={portails.nombre} onChange={e => setPortails(p => ({ ...p, nombre: e.target.value }))} disabled={!portails.checked} />
                       </div>
                     </div>
                     <div className="mt-3 border-top pt-3">
@@ -202,7 +202,7 @@ export default function BailRemiseCles() {
                         {autresList.map((a, idx) => (
                           <div className="d-flex align-items-center gap-2" key={idx}>
                             <input type="text" className="form-control" placeholder="Ex: télécommande, badge" value={a.label} onChange={e => updateAutre(idx, 'label', e.target.value)} />
-                            <input type="number" min="0" className="form-control" style={{ width: 110 }} placeholder="Qté" value={a.nombre} onChange={e => updateAutre(idx, 'nombre', e.target.value)} />
+                            <input type="number" onWheel={(e) => e.target.blur()} min="0" className="form-control" style={{ width: 110 }} placeholder="Qté" value={a.nombre} onChange={e => updateAutre(idx, 'nombre', e.target.value)} />
                             <button type="button" className="btn btn-icon btn-outline-danger" onClick={() => removeAutre(idx)} title="Retirer"><i className="bi bi-x-lg"></i></button>
                           </div>
                         ))}

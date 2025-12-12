@@ -17,7 +17,7 @@ class StoreUniteOwnershipsRequest extends FormRequest
     {
         return [
             'unite_id' => ['required', 'integer', 'exists:unites,id'],
-            'date_debut' => ['required', 'date'],
+            'date_debut' => ['nullable', 'date'],
             'date_fin' => ['nullable', 'date', 'after_or_equal:date_debut'],
             'owners' => ['required', 'array', 'min:1'],
             'owners.*.proprietaire_id' => ['required', 'integer', 'distinct', 'exists:proprietaires,id'],

@@ -78,6 +78,10 @@ class UserRoleController extends Controller
     {
         $data = $request->validate([
             'permissions' => ['required', 'array'],
+            'status_add_allowed' => ['nullable', 'string'],
+            'status_edit_allowed' => ['nullable', 'string'],
+            'status_view_allowed' => ['nullable', 'string'],
+            'status_delete_allowed' => ['nullable', 'string'],
         ]);
 
         $input = $data['permissions'] ?? [];
@@ -108,9 +112,23 @@ class UserRoleController extends Controller
 
         $user->syncPermissions($validNames);
 
+        // Update status permissions on user model
+        foreach (['status_add_allowed', 'status_edit_allowed', 'status_view_allowed', 'status_delete_allowed'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $user->$field = $data[$field];
+            }
+        }
+        $user->save();
+
         return response()->json([
             'permissions' => $user->getAllPermissions()->pluck('name'),
             'direct_permissions' => $user->permissions()->pluck('name'),
+            'status_permissions' => [
+                'add' => $user->status_add_allowed,
+                'edit' => $user->status_edit_allowed,
+                'view' => $user->status_view_allowed,
+                'delete' => $user->status_delete_allowed,
+            ]
         ]);
     }
 }

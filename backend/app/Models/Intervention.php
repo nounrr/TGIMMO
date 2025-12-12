@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasDocuments;
 
 class Intervention extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDocuments;
 
     protected $fillable = [
         'bail_id', 'prestataire_id', 'reclamation_id',

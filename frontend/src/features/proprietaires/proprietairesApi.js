@@ -11,11 +11,11 @@ export const proprietairesApi = baseApi.injectEndpoints({
         if (params.per_page) queryParams.append('per_page', params.per_page);
         
         // Recherche
-        if (params.search) queryParams.append('q', params.search);
+        if (params.q) queryParams.append('q', params.q);
         
         // Filtre par type
-        if (params.type && params.type !== 'all') {
-          queryParams.append('type', params.type);
+        if (params.type_proprietaire && params.type_proprietaire !== 'all') {
+          queryParams.append('type', params.type_proprietaire);
         }
 
         // Filtre par statut

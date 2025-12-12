@@ -10,6 +10,7 @@ import ProprietairesShadcn from './pages/ProprietairesShadcn';
 import UnitesShadcn from './pages/UnitesShadcn';
 import UniteOwners from './pages/UniteOwners';
 import MandatsGestionShadcn from './pages/MandatsGestionShadcn';
+import CreateMandatShadcn from './pages/CreateMandatShadcn';
 import AvenantsMandatShadcn from './pages/AvenantsMandatShadcn';
 import MandatEditShadcn from './pages/MandatEditShadcn';
 import AvenantEditShadcn from './pages/AvenantEditShadcn';
@@ -37,6 +38,8 @@ import LiquidationList from './pages/LiquidationList';
 import TestDebug from './pages/TestDebug';
 import GuideShadcn from './pages/GuideShadcn';
 import TestUniteMandat from './pages/TestUniteMandat';
+import GedShadcn from './pages/GedShadcn';
+import PaiementsLocataires from './pages/PaiementsLocataires';
 
 
 export default function App() {
@@ -60,6 +63,7 @@ export default function App() {
             <Route path="/unites" element={<UnitesShadcn />} />
             <Route path="/unites/:uniteId/owners" element={<UniteOwners />} />
             <Route path="/mandats" element={<MandatsGestionShadcn />} />
+            <Route path="/mandats/nouveau" element={<CreateMandatShadcn />} />
             <Route path="/mandats/:id" element={<MandatEditShadcn />} />
             <Route path="/avenants" element={<AvenantsMandatShadcn />} />
             <Route path="/avenants/:id" element={<AvenantEditShadcn />} />
@@ -87,6 +91,8 @@ export default function App() {
             <Route path="/test-unite-mandat" element={<TestUniteMandat />} />
             <Route path="/roles-permissions" element={<RolesPermissionsShadcn />} />
             <Route path="/employes" element={<EmployesShadcn />} />
+            <Route path="/ged" element={<GedShadcn />} />
+            <Route path="/paiements-locataires" element={<PaiementsLocataires />} />
             <Route path="/guide" element={<GuideShadcn />} />
             <Route path="*" element={<Dashboard />} />
           </Route>

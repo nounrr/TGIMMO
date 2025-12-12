@@ -7,6 +7,7 @@ use App\Models\Locataire;
 use App\Traits\HandlesStatusPermissions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 
 class LocataireController extends Controller
 {
@@ -26,7 +27,9 @@ class LocataireController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Locataire::query();
+        $query = Locataire::query()->with(['baux' => function($q) {
+            $q->whereIn('statut', ['actif', 'signe', 'en_attente'])->orderBy('date_debut', 'desc');
+        }, 'baux.unite.proprietaires']);
 
         // Appliquer le filtrage par statut selon les permissions
         $query = $this->applyStatusPermissions($query, 'locataires');
@@ -50,7 +53,7 @@ class LocataireController extends Controller
         // Tri
         $sortBy = $request->query('sort_by');
         $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $allowedSorts = ['nom', 'prenom', 'raison_sociale', 'type_personne', 'statut', 'email', 'telephone', 'created_at'];
+        $allowedSorts = ['nom', 'prenom', 'raison_sociale', 'type_personne', 'statut', 'email', 'telephone', 'created_at', 'updated_at'];
         if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
             $query->orderBy($sortBy, $sortDir);
         } else {
@@ -112,7 +115,7 @@ class LocataireController extends Controller
      */
     public function update(Request $request, Locataire $locataire)
     {
-        $data = $this->validatedData($request, false);
+        $data = $this->validatedData($request, false, $locataire->id);
         $locataire->update($data);
         return response()->json($locataire);
     }
@@ -126,7 +129,7 @@ class LocataireController extends Controller
         return response()->json(null, 204);
     }
 
-    private function validatedData(Request $request, bool $creating): array
+    private function validatedData(Request $request, bool $creating, ?int $id = null): array
     {
         $user = $request->user();
         $isCommercial = $user && $user->hasRole('commercial');
@@ -140,20 +143,22 @@ class LocataireController extends Controller
             'prenom_ar' => ['nullable', 'string', 'max:150'],
             'raison_sociale' => ['nullable', 'string', 'max:200'],
             'profession_activite' => ['nullable', 'string', 'max:150'],
-            'telephone' => ['nullable', 'string', 'max:20'],
+            'telephone' => ['nullable', 'array'],
+            'telephone.*' => ['string', 'regex:/^0[5-7][0-9]{8}$/'],
             'email' => ['nullable', 'email', 'max:150'],
             'adresse_actuelle' => ['nullable', 'string', 'max:255'],
             'adresse_ar' => ['nullable', 'string', 'max:255'],
-            'cin' => ['nullable', 'string', 'max:20'],
+            'ville' => ['nullable', 'string', 'max:100'],
+            'cin' => ['nullable', 'string', 'regex:/^[A-Z]{1,2}[0-9]{1,6}$/', Rule::unique('locataires', 'cin')->ignore($id)],
             'rc' => ['nullable', 'string', 'max:50'],
-            'ice' => ['nullable', 'string', 'max:50'],
+            'ice' => ['nullable', 'string', 'regex:/^[0-9]{15}$/'],
             'date_naissance' => ['nullable', 'date'],
             'lieu_naissance' => ['nullable', 'string', 'max:150'],
             'date_creation_entreprise' => ['nullable', 'date'],
             'nationalite' => ['nullable', 'string', 'max:100'],
             'situation_familiale' => ['nullable', 'in:celibataire,marie,divorce,veuf'],
             'nb_personnes_foyer' => ['nullable', 'integer', 'min:0'],
-            'ifiscale' => ['nullable', 'string', 'max:50'],
+            'ifiscale' => ['nullable', 'string', 'regex:/^[0-9]{1,50}$/'],
             'adresse_bien_loue' => ['nullable', 'string', 'max:255'],
             'employeur_denomination' => ['nullable', 'string', 'max:200'],
             'employeur_adresse' => ['nullable', 'string', 'max:255'],

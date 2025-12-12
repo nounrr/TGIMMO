@@ -37,6 +37,18 @@ class UserController extends Controller
         if ($request->boolean('withRoles')) {
             $q->with('roles');
         }
+
+        // Tri
+        $sortBy = $request->query('sort_by');
+        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $allowedSorts = ['name', 'email', 'created_at', 'updated_at', 'statut'];
+        
+        if ($sortBy && in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortDir);
+        } else {
+            $q->orderBy('created_at', 'desc');
+        }
+
         $perPage = (int) $request->query('per_page', 15);
         return response()->json($q->paginate($perPage));
     }

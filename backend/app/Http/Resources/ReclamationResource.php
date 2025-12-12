@@ -12,7 +12,7 @@ class ReclamationResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'bail_id' => $this->bail_id,
+            'unite_id' => $this->unite_id,
             'reclamation_type_id' => $this->reclamation_type_id,
             'description' => $this->description,
             'source' => $this->source,
@@ -21,9 +21,11 @@ class ReclamationResource extends JsonResource
                 'id' => $this->type->id,
                 'name' => $this->type->name,
             ] : null,
-            'bail' => $this->bail ? [
-                'id' => $this->bail->id,
-                'numero_bail' => $this->bail->numero_bail,
+            'unite' => $this->unite ? [
+                'id' => $this->unite->id,
+                'numero_unite' => $this->unite->numero_unite,
+                'immeuble' => $this->unite->immeuble,
+                'adresse' => $this->unite->adresse,
             ] : null,
             'justifications' => JustificationReclamationResource::collection($this->whenLoaded('justifications')),
             'created_at' => $this->created_at,

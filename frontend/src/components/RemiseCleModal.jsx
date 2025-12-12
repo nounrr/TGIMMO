@@ -85,21 +85,21 @@ export default function RemiseCleModal({ bailId, bail, onClose, onCreated }) {
                           <div className="form-check d-flex align-items-center gap-2 p-3 rounded-3" style={{ background:'#f1f5f9' }}>
                             <input type="checkbox" className="form-check-input" checked={portes.checked} onChange={e=>setPortes(p=>({ ...p, checked: e.target.checked }))} id="modal_porte" />
                             <label htmlFor="modal_porte" className="form-check-label fw-medium me-auto">Porte principale</label>
-                            <input type="number" min="0" className="form-control form-control-sm" style={{ width:90 }} placeholder="Qté" value={portes.nombre} onChange={e=>setPortes(p=>({ ...p, nombre: e.target.value }))} />
+                            <input type="number" onWheel={(e) => e.target.blur()} min="0" className="form-control form-control-sm" style={{ width:90 }} placeholder="Qté" value={portes.nombre} onChange={e=>setPortes(p=>({ ...p, nombre: e.target.value }))} />
                           </div>
                         </div>
                         <div className="col-md-6">
                           <div className="form-check d-flex align-items-center gap-2 p-3 rounded-3" style={{ background:'#f1f5f9' }}>
                             <input type="checkbox" className="form-check-input" checked={boites.checked} onChange={e=>setBoites(p=>({ ...p, checked: e.target.checked }))} id="modal_boite" />
                             <label htmlFor="modal_boite" className="form-check-label fw-medium me-auto">Boîte aux lettres</label>
-                            <input type="number" min="0" className="form-control form-control-sm" style={{ width:90 }} placeholder="Qté" value={boites.nombre} onChange={e=>setBoites(p=>({ ...p, nombre: e.target.value }))} />
+                            <input type="number" onWheel={(e) => e.target.blur()} min="0" className="form-control form-control-sm" style={{ width:90 }} placeholder="Qté" value={boites.nombre} onChange={e=>setBoites(p=>({ ...p, nombre: e.target.value }))} />
                           </div>
                         </div>
                         <div className="col-md-6">
                           <div className="form-check d-flex align-items-center gap-2 p-3 rounded-3" style={{ background:'#f1f5f9' }}>
                             <input type="checkbox" className="form-check-input" checked={portails.checked} onChange={e=>setPortails(p=>({ ...p, checked: e.target.checked }))} id="modal_portail" />
                             <label htmlFor="modal_portail" className="form-check-label fw-medium me-auto">Portail / Garage</label>
-                            <input type="number" min="0" className="form-control form-control-sm" style={{ width:90 }} placeholder="Qté" value={portails.nombre} onChange={e=>setPortails(p=>({ ...p, nombre: e.target.value }))} />
+                            <input type="number" onWheel={(e) => e.target.blur()} min="0" className="form-control form-control-sm" style={{ width:90 }} placeholder="Qté" value={portails.nombre} onChange={e=>setPortails(p=>({ ...p, nombre: e.target.value }))} />
                           </div>
                         </div>
                       </div>
@@ -112,7 +112,7 @@ export default function RemiseCleModal({ bailId, bail, onClose, onCreated }) {
                           {autresList.map((a, idx) => (
                             <div key={idx} className="d-flex align-items-center gap-2">
                               <input type="text" className="form-control" placeholder="Libellé" value={a.label} onChange={e=>updateAutre(idx,'label', e.target.value)} />
-                              <input type="number" min="0" className="form-control" style={{ width:90 }} placeholder="Qté" value={a.nombre} onChange={e=>updateAutre(idx,'nombre', e.target.value)} />
+                              <input type="number" onWheel={(e) => e.target.blur()} min="0" className="form-control" style={{ width:90 }} placeholder="Qté" value={a.nombre} onChange={e=>updateAutre(idx,'nombre', e.target.value)} />
                               <button type="button" className="btn btn-outline-danger" onClick={()=>removeAutre(idx)} title="Retirer"><i className="bi bi-x"></i></button>
                             </div>
                           ))}

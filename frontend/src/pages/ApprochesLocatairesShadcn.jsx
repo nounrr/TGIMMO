@@ -20,6 +20,7 @@ import { MessageSquare, Plus, User, Trash2, Filter, RefreshCw, FileText, Pencil,
 import { AudioRecorder } from '../components/AudioRecorder';
 import { MiniAudioPlayer } from '../components/MiniAudioPlayer';
 import { PaginationControl } from '@/components/PaginationControl';
+import LocataireFormDialog from '@/components/LocataireFormDialog';
 
 export default function ApprochesLocatairesShadcn() {
   const [filters, setFilters] = useState({ locataire_id: '' });
@@ -47,6 +48,7 @@ export default function ApprochesLocatairesShadcn() {
   const [audioBlob, setAudioBlob] = useState(null);
   const [existingAudioUrl, setExistingAudioUrl] = useState(null);
   const [formKey, setFormKey] = useState(0);
+  const [showLocataireDialog, setShowLocataireDialog] = useState(false);
   
   const [filterLocataire, setFilterLocataire] = useState(null);
   const { can, permissions, user } = useAuthz();
@@ -224,19 +226,33 @@ export default function ApprochesLocatairesShadcn() {
                     <User className="h-4 w-4 text-primary" />
                     Locataire <span className="text-red-500">*</span>
                   </Label>
-                  <Select
-                    value={selectedLocataire}
-                    onChange={setSelectedLocataire}
-                    options={locataireOptions}
-                    styles={customSelectStyles}
-                    placeholder="Rechercher un locataire..."
-                    isClearable
-                    isSearchable
-                    noOptionsMessage={() => "Aucun locataire trouvé"}
-                    loadingMessage={() => "Chargement..."}
-                    className="react-select-container"
-                    classNamePrefix="react-select"
-                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1 min-w-0">
+                      <Select
+                        value={selectedLocataire}
+                        onChange={setSelectedLocataire}
+                        options={locataireOptions}
+                        styles={customSelectStyles}
+                        placeholder="Rechercher un locataire..."
+                        isClearable
+                        isSearchable
+                        noOptionsMessage={() => "Aucun locataire trouvé"}
+                        loadingMessage={() => "Chargement..."}
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                      />
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="default" 
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => setShowLocataireDialog(true)}
+                      title="Nouveau locataire"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                   {selectedLocataire && (
                     <div className="mt-2 p-2 bg-slate-50 rounded-md flex items-center gap-2 border">
                       <div className="bg-primary/10 rounded-full p-2 h-8 w-8 flex items-center justify-center">
@@ -496,6 +512,22 @@ export default function ApprochesLocatairesShadcn() {
           to={meta.to}
         />
       </Card>
+
+      <LocataireFormDialog 
+        open={showLocataireDialog} 
+        onOpenChange={setShowLocataireDialog}
+        onSuccess={(newLocataire) => {
+          const label = newLocataire.type_locataire === 'societe' 
+            ? newLocataire.raison_sociale 
+            : [newLocataire.prenom, newLocataire.nom].filter(Boolean).join(' ');
+            
+          setSelectedLocataire({
+            value: newLocataire.id,
+            label: label || `Locataire #${newLocataire.id}`,
+            data: newLocataire
+          });
+        }}
+      />
     </div>
   );
 }

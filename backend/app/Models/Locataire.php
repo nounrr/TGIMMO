@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasDocuments;
 
 class Locataire extends Model
 {
-    use HasFactory;
+    use HasFactory, HasDocuments;
 
     protected $table = 'locataires';
 
@@ -31,6 +32,7 @@ class Locataire extends Model
         'adresse_bien_loue',
         'adresse_actuelle',
         'adresse_ar',
+        'ville',
         'telephone',
         'email',
         'profession_activite',
@@ -46,6 +48,7 @@ class Locataire extends Model
     ];
 
     protected $casts = [
+        'telephone' => 'array',
         'date_naissance' => 'date',
         'date_creation_entreprise' => 'date',
         'revenu_mensuel_net' => 'decimal:2',
@@ -55,4 +58,14 @@ class Locataire extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    public function baux()
+    {
+        return $this->hasMany(Bail::class);
+    }
+
+    public function bauxActifs()
+    {
+        return $this->hasMany(Bail::class)->where('statut', 'actif');
+    }
 }

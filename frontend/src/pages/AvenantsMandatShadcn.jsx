@@ -32,7 +32,7 @@ export default function AvenantsMandatShadcn() {
   const { data: mandatsData } = useGetMandatsQuery({ per_page: 1000 });
   
   const rows = data?.data || data || [];
-  const meta = data?.meta || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
+  const meta = data || { current_page: 1, last_page: 1, from: 0, to: 0, total: 0 };
   const mandats = mandatsData?.data || mandatsData || [];
 
   const customSelectStyles = {

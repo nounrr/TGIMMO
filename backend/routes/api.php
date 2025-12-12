@@ -25,11 +25,13 @@ use App\Http\Controllers\API\DevisDocumentController;
 use App\Http\Controllers\API\FactureDocumentController;
 use App\Http\Controllers\API\BailPaiementController;
 use App\Http\Controllers\API\BailChargesController;
+use App\Http\Controllers\API\FranchiseBailController;
 use App\Http\Controllers\ApprocheProprietaireController;
 use App\Http\Controllers\ApprocheLocataireController;
 use App\Http\Controllers\ImputationChargeController;
 use App\Http\Controllers\API\LiquidationController;
 use App\Http\Controllers\API\MaintenanceController;
+use App\Http\Controllers\GedController;
 
 Route::prefix('v1')->group(function () {
     // Auth
@@ -76,6 +78,11 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('mandats-gestion', MandatGestionController::class)
             ->parameters(['mandats-gestion' => 'mandats_gestion']);
         Route::get('mandats-gestion/{mandats_gestion}/docx', [MandatGestionController::class, 'downloadDocx'])->name('mandats-gestion.docx');
+        // PDF generation is handled on the frontend now
+        // Route::get('mandats-gestion/{mandats_gestion}/pdf', [MandatGestionController::class, 'downloadPdf'])->name('mandats-gestion.pdf');
+        // Route::post('mandats-gestion/{mandats_gestion}/generate-pdf', [MandatGestionController::class, 'generatePdf'])->name('mandats-gestion.generate-pdf');
+        Route::get('mandats-gestion/{mandats_gestion}/editor-template', [MandatGestionController::class, 'editorTemplate'])->middleware('permission:mandats.view');
+        Route::post('mandats-gestion/{mandats_gestion}/render-preview', [MandatGestionController::class, 'renderPreview'])->middleware('permission:mandats.view');
 
         // Avenants au mandat (CRUD)
         Route::apiResource('avenants-mandat', AvenantMandatController::class)
@@ -86,9 +93,23 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('baux', BailController::class);
         Route::get('baux/{bail}/pdf', [BailController::class, 'downloadPdf'])->name('baux.pdf');
         Route::get('baux/{bail}/docx', [BailController::class, 'downloadDocx'])->name('baux.docx');
+        Route::get('baux/{bail}/editor-template', [BailController::class, 'editorTemplate'])->middleware('permission:baux.view');
+        Route::post('baux/{bail}/render-preview', [BailController::class, 'renderPreview'])->middleware('permission:baux.view');
+        Route::get('baux/{bail}/resiliation-template', [BailController::class, 'resiliationTemplate'])->middleware('permission:baux.view');
+        Route::post('baux/{bail}/render-resiliation-preview', [BailController::class, 'renderResiliationPreview'])->middleware('permission:baux.view');
+        
+        // Franchises (remises) des baux
+        Route::get('baux/{bail}/franchises', [FranchiseBailController::class, 'index']);
+        Route::post('franchises', [FranchiseBailController::class, 'store']);
+        Route::get('franchises/{franchise}', [FranchiseBailController::class, 'show']);
+        Route::patch('franchises/{franchise}', [FranchiseBailController::class, 'update']);
+        Route::delete('franchises/{franchise}', [FranchiseBailController::class, 'destroy']);
+        Route::post('baux/{bail}/calculer-loyer', [FranchiseBailController::class, 'calculerLoyer']);
+        
         // Charges mensuelles du bail
         Route::get('baux/{bail}/charges-mensuelles', [BailChargesController::class, 'index']);
         // Paiements mensuels du bail
+        Route::get('paiements/all-baux', [BailPaiementController::class, 'getAllBauxWithPaiements']);
         Route::get('baux/{bail}/paiements', [BailPaiementController::class, 'index']);
         Route::post('baux/{bail}/paiements', [BailPaiementController::class, 'store']);
         Route::patch('paiements/{paiement}', [BailPaiementController::class, 'update']);
@@ -97,6 +118,10 @@ Route::prefix('v1')->group(function () {
     Route::get('baux/{bail}/remises-cles', [RemiseCleController::class, 'index']);
     Route::post('baux/{bail}/remises-cles', [RemiseCleController::class, 'store']);
     Route::get('remises-cles', [RemiseCleController::class, 'all']);
+    Route::get('remises-cles/{remiseCle}', [RemiseCleController::class, 'show']);
+    Route::put('remises-cles/{remiseCle}', [RemiseCleController::class, 'update']);
+    Route::get('remises-cles/{remiseCle}/editor-template', [RemiseCleController::class, 'editorTemplate']);
+    Route::post('remises-cles/{remiseCle}/render-preview', [RemiseCleController::class, 'renderPreview']);
 
         // Réclamations
         Route::apiResource('reclamation-types', ReclamationTypeController::class)
@@ -146,5 +171,14 @@ Route::prefix('v1')->group(function () {
         Route::get('users/{user}/roles', [UserRoleController::class, 'listRoles']);
         Route::get('users/{user}/permissions', [UserRoleController::class, 'listPermissions']);
         Route::post('users/{user}/permissions/sync', [UserRoleController::class, 'syncPermissions']);
+
+        // GED (Document management) with permissions
+        Route::get('ged', [GedController::class, 'index'])->middleware('permission:ged.view');
+        Route::get('ged/{id}', [GedController::class, 'show'])->middleware('permission:ged.view');
+        Route::post('ged', [GedController::class, 'store'])->middleware('permission:ged.upload');
+        Route::patch('ged/{id}', [GedController::class, 'update'])->middleware('permission:ged.update');
+        Route::delete('ged/{id}', [GedController::class, 'destroy'])->middleware('permission:ged.delete');
+        Route::post('ged/{id}/attach', [GedController::class, 'attach'])->middleware('permission:ged.link');
+        Route::post('ged/{id}/detach', [GedController::class, 'detach'])->middleware('permission:ged.link');
     });
 });

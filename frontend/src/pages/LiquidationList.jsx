@@ -168,6 +168,7 @@ export default function LiquidationList() {
                   <Label>Année</Label>
                   <Input 
                     type="number" 
+                    onWheel={(e) => e.target.blur()}
                     value={pendingFilters.annee} 
                     onChange={(e) => handlePendingFilterChange('annee', e.target.value)}
                   />
@@ -255,6 +256,7 @@ export default function LiquidationList() {
                   <Label>Année</Label>
                   <Input 
                     type="number" 
+                    onWheel={(e) => e.target.blur()}
                     value={historyFilters.annee} 
                     onChange={(e) => handleHistoryFilterChange('annee', e.target.value)}
                   />
